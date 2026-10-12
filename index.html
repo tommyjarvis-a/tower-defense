@@ -131,6 +131,7 @@ function draw(now){const w=W.clientWidth,h=W.clientHeight;if(C.width!=Math.round
  for(const f of G.fx){X.globalAlpha=Math.max(0,f.life/f.max);glow(f.c,10);X.strokeStyle=f.c;X.lineWidth=2;X.beginPath();X.arc(px(f.x),py(f.y),cell*(.5-.3*f.life/f.max),0,7);X.stroke();X.globalAlpha=1;X.shadowBlur=0;if(f.t){X.fillStyle='#ffd84a';X.font='bold 12px system-ui';X.textAlign='center';X.fillText(f.t,px(f.x),py(f.y)-cell*(.6-.3*f.life/f.max))}}
  if(sel){const bw=110*U,bh=32*U,sx=px(sel.x+.5),sy=Math.max(HH+bh+4,py(sel.y-.35)),v=Math.floor(T[sel.k].cost/2),bx=Math.max(4,Math.min(sx-bw/2,ox+cell*COLS-bw-4));G.sellBtn=[bx,sy-bh-2,bw,bh];btn(bx,sy-bh-2,bw,bh,'Sell ◉'+v,'#ffd84a',false,false)}else G.sellBtn=null;
  drawHUD();
+ {const r=updToast();if(r){btn(...r,'⟳ Update ready — tap to reload','#ffd84a',true,false)}}
  OV=[];const ov=(title,col,lines,btns)=>{X.fillStyle='rgba(4,6,16,.78)';X.fillRect(0,0,w,h);const cx=w/2,cy=h/2;X.textAlign='center';X.textBaseline='middle';
   X.fillStyle=col;glow(col,18*U);X.font='800 '+Math.round(34*U)+'px system-ui';X.fillText(title,cx,cy-70*U);X.shadowBlur=0;X.fillStyle='#e8f8ff';X.font='600 '+Math.round(16*U)+'px system-ui';lines.forEach((l,i)=>X.fillText(l,cx,cy-30*U+i*22*U));
   const bw=Math.min(170*U,(w-40)/btns.length-10),bh=46*U,y0=cy+(lines.length*22+10)*U;btns.forEach(([lab,c,act],i)=>{const x=cx-(btns.length*(bw+12)-12)/2+i*(bw+12);btn(x,y0,bw,bh,lab,c,false,false);OV.push({r:[x,y0,bw,bh],act})})};
@@ -164,7 +165,7 @@ function update(dt){if(G.over||G.won)return;G.time=(G.time||0)+dt;if(G.msgT>0){G
   else if(m.atk){m.atk.hp-=m.dps*dt;if(Math.random()<dt*6)G.fx.push({x:m.atk.x+.5,y:m.atk.y+.5,c:'#ffa020',life:.2,max:.2})}}
  for(const b of G.bars)if(b.hp<=0){destroyed=true;G.fx.push({x:b.x+.5,y:b.y+.5,c:'#ffa020',life:.6,max:.6});if(sel==b)sel=null}
  if(destroyed){G.bars=G.bars.filter(b=>b.hp>0);recompute()}
- if(G.lives<=0){G.lives=0;G.over=true;G.active=false;G.msg=''}
+ if(G.lives<=0){G.lives=0;G.over=true;G.active=false;G.msg='';tryAutoReload()}
  G.mobs=G.mobs.filter(m=>!m.dead);
  for(const t of G.towers){const S=T[t.k];t.cd-=dt;let best=null,bd=1e9;for(const m of G.mobs){const dx=m.p[0]-t.x-.5,dy=m.p[1]-t.y-.5,r=remaining(m);if(dx*dx+dy*dy<=S.range*S.range&&r<bd&&m.hp>0){bd=r;best=m}}
   if(best){t.ang=Math.atan2(best.p[1]-t.y-.5,best.p[0]-t.x-.5);if(t.cd<=0){t.cd=1/S.rate;t.fl=performance.now();best.hp-=S.dmg;G.shots.push({k:t.k,x1:t.x+.5,y1:t.y+.5,x2:best.p[0]+(Math.random()-.5)*.15,y2:best.p[1]+(Math.random()-.5)*.15,life:t.k=='mg'?.06:.18,max:t.k=='mg'?.06:.18});
@@ -172,7 +173,7 @@ function update(dt){if(G.over||G.won)return;G.time=(G.time||0)+dt;if(G.msgT>0){G
  G.mobs=G.mobs.filter(m=>m.hp>0);
  for(const a of[G.shots,G.fx])for(const s of a)s.life-=dt;G.shots=G.shots.filter(s=>s.life>0);G.fx=G.fx.filter(s=>s.life>0);
  if(G.active&&G.spawnLeft==0&&G.mobs.length==0&&!G.over){G.active=false;const b=25+G.wave*5;G.coins+=b;
-  if(G.wave>=CFG.TOTAL_WAVES){G.won=true;G.msg=''}else{G.msg=G.wave==CFG.TOTAL_WAVES-1?'Wave '+G.wave+' cleared! ⚠ BOSS NEXT':'Wave '+G.wave+' cleared! +'+b;G.msgT=2.5}}}
+  if(G.wave>=CFG.TOTAL_WAVES){G.won=true;G.msg='';tryAutoReload()}else{G.msg=G.wave==CFG.TOTAL_WAVES-1?'Wave '+G.wave+' cleared! ⚠ BOSS NEXT':'Wave '+G.wave+' cleared! +'+b;G.msgT=2.5}}}
 // advance simulation by real dt: frozen when paused, timeScale 2 while ⏩ held, substepped so fast mobs never skip
 function advance(dt){if(G.paused||G.won||G.over)return;const scaled=dt*(G.hold?CFG.FAST_SCALE:1);const n=Math.max(1,Math.ceil(scaled/CFG.MAX_STEP));for(let i=0;i<n;i++)update(scaled/n)}
 function loop(now){const dt=Math.min(.05,(now-(last||now))/1000);last=now;advance(dt);draw(now);requestAnimationFrame(loop)}
@@ -187,6 +188,7 @@ function place(k,gx,gy){const c=key(gx,gy);if(G.coins<T[k].cost){G.msg='Not enou
  G.coins-=T[k].cost;G.towers.push({k,x:gx,y:gy,cd:0,ang:0,fl:-1e9});return true}
 function tap(x,y){const p=[x,y],B=bounds(),H=hudBtns();
  for(const o of OV)if(inR(p,o.r)){o.act();return}
+ if(inR(p,updToast())){doReload();return}
  if(inR(p,B.go)){if(G.over||G.won)reset();else if(G.paused)G.paused=false;else if(G.active){G.paused=true;G.hold=false}else startRound();return}
  if(G.paused||G.over||G.won)return;
  if(G.msgT<=0||G.msg=='Not enough coins')G.msg='';
@@ -207,5 +209,14 @@ addEventListener('mouseup',()=>{if(holdTouch==null)release()});
 addEventListener('blur',release);document.addEventListener('visibilitychange',release);
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
-reset();layout();requestAnimationFrame(loop);
+// ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
+const APP_VERSION='20261012163850';
+let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
+function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
+// auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
+function tryAutoReload(){if(!UPD)return;const fresh=!G.active&&(G.wave==0&&!G.towers.length&&!G.bars.length||G.over||G.won);if(fresh)doReload()}
+async function checkUpdate(){try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=String((await r.json()).v||'');if(!v||v==APP_VERSION||ssGet('td_reloaded_'+v))return;UPD=v;tryAutoReload()}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState=='visible')checkUpdate()});
+function updToast(){if(!UPD||ssGet('td_reloaded_'+UPD))return null;const w=W.clientWidth,tw=Math.min(w-20,250*U),th=34*U,r=[(ox+cell*COLS/2)-tw/2,HH+6,tw,th];return r}
+reset();layout();requestAnimationFrame(loop);checkUpdate();
 </script></body></html>
