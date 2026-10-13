@@ -22,7 +22,9 @@ const CFG={
  MUSIC_VOL:0.35, SFX_VOL:0.6, MAX_VOICES:14,
  SMOKE_DENSITY:1.0,   // smoke thickness multiplier (1 = heavy; 0 = none)
  MAX_TOWER_LEVEL:5, UPGRADE_COST_FRAC:0.25, UPGRADE_POWER:0.25, // upgrade = round(cost*0.25); +25% power per level, compounding
- MAX_ZOOM:3,      // level length; wave 10 is the boss wave
+ MAX_ZOOM:3,
+ GLUE:{cost:250,period:1.5,radius:1.8,radiusPerLvl:0.05,slow:0.4,maxSlow:0.7,dur:2,bossMul:0.5,dmg:0},
+ ROCKET:{cost:500,dmg:150,range:6.5,minRange:1.8,splash:1,splashFrac:0.6,period:2,speed:7},      // level length; wave 10 is the boss wave
  START_COINS:500, START_LIVES:20,
  MOB_HP:50,           // base mob HP (wave 1)
  HP_GROWTH:0.03,      // mob + boss HP grow 3% per wave, compounding
@@ -129,11 +131,12 @@ function draw(now){const w=W.clientWidth,h=W.clientHeight;if(C.width!=Math.round
  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)(PATH.has(key(x,y))?drawPath:drawGrass)(px(x),py(y),cell);
  X.fillStyle='#7dff4a';X.font='bold '+Math.round(Math.max(10,cell*.28))+'px system-ui';X.textBaseline='alphabetic';X.textAlign='left';X.fillText('IN ▶',px(0)+2,py(ENT[1])-6);X.textAlign='right';X.fillText('▶ OUT',px(COLS)-2,py(EXI[1])-6);
  for(const b of G.bars){if(b==sel){X.strokeStyle='#ffa020';X.lineWidth=2;X.strokeRect(px(b.x)+1,py(b.y)+1,cell-2,cell-2)}drawBarricade(px(b.x+.5),py(b.y+.5),cell,b.hp/(b.max||BAR_HP))}
- for(const t of G.towers){if(t==sel){X.fillStyle='rgba(0,240,255,.08)';X.strokeStyle=T[t.k].col;X.lineWidth=1.5;X.beginPath();X.arc(px(t.x+.5),py(t.y+.5),T[t.k].range*cell,0,7);X.fill();X.stroke()}
+ for(const t of G.towers){if(t==sel){X.fillStyle='rgba(0,240,255,.08)';X.strokeStyle=T[t.k].col;X.lineWidth=1.5;X.beginPath();X.arc(px(t.x+.5),py(t.y+.5),rangeOf(t)*cell,0,7);X.fill();X.stroke();if(T[t.k].minRange){X.setLineDash([5,5]);X.strokeStyle='#ff5a5a';X.fillStyle='rgba(255,60,60,.12)';X.beginPath();X.arc(px(t.x+.5),py(t.y+.5),T[t.k].minRange*cell,0,7);X.fill();X.stroke();X.setLineDash([])}}
   drawTower(t.k,px(t.x+.5),py(t.y+.5),cell,t.ang,now-t.fl<50)}
  for(const m of G.mobs)(m.boss?drawBoss:drawMob)(px(m.p[0]),py(m.p[1]),cell,m.hp/m.max,now/120+m.id);
  for(const s of G.shots)drawShot(s.k,px(s.x1),py(s.y1),px(s.x2),py(s.y2),s.life/s.max);
  for(const f of G.fx){X.globalAlpha=Math.max(0,f.life/f.max);glow(f.c,10);X.strokeStyle=f.c;X.lineWidth=2;X.beginPath();X.arc(px(f.x),py(f.y),cell*(.5-.3*f.life/f.max),0,7);X.stroke();X.globalAlpha=1;X.shadowBlur=0;if(f.t){X.fillStyle='#ffd84a';X.font='bold 12px system-ui';X.textAlign='center';X.fillText(f.t,px(f.x),py(f.y)-cell*(.6-.3*f.life/f.max))}}
+ drawExtra(now);gooTint();
  // tower popup (upgrade/sell) is drawn crisp in overlayWorld()
  drawHUD();
  {const r=updToast();if(r){btn(...r,'⟳ Update ready — tap to reload','#ffd84a',true,false)}}
@@ -216,7 +219,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261013112553';
+const APP_VERSION='20261013120509';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
@@ -339,14 +342,15 @@ const STATS=()=>[['◉ '+G.coins,'#ffd84a'],['♥ '+G.lives,'#ff5a7a'],['W '+G.w
 function stats(x,y,fs){X.font='800 '+fs+'px system-ui';X.textBaseline='middle';X.textAlign='left';let cx=x;for(const[t,c]of STATS()){X.fillStyle=c;X.fillText(t,cx,y);cx+=X.measureText(t).width+fs*.9}return cx}
 function statsW(fs){X.font='800 '+fs+'px system-ui';return STATS().reduce((a,[t])=>a+X.measureText(t).width+fs*.9,0)-fs*.9}
 function chip(r,k,on){const[x,y,w,h]=r,dis=G.coins<T[k].cost;X.fillStyle=on?'rgba(0,240,255,.2)':'rgba(14,18,40,.85)';X.strokeStyle=dis?'#445':T[k].col;X.lineWidth=2;glow(dis?'transparent':T[k].col,on?14:5);X.beginPath();X.roundRect(x,y,w,h,Math.min(14*U,h/4));X.fill();X.stroke();X.shadowBlur=0;
- const s=Math.min(w,h)*.5;drawIcon(k,x+w/2,y+h*.42,s);X.globalAlpha=dis?.5:1;X.fillStyle='#ffd84a';X.font='800 '+Math.round(Math.min(13*U,w/5))+'px system-ui';X.textAlign='center';X.textBaseline='middle';X.fillText('◉'+T[k].cost,x+w/2,y+h*.84);X.globalAlpha=1}
+ const s=Math.min(w,h)*.5;drawIcon(k,x+w/2,y+h*.42,s);X.globalAlpha=dis?.5:1;X.fillStyle='#ffd84a';X.font='800 '+Math.round(Math.min(13*U,w/4.1))+'px system-ui';X.textAlign='center';X.textBaseline='middle';X.fillText('◉'+T[k].cost,x+w/2,y+h*.84);X.globalAlpha=1}
 layout=function(){dpr=window.devicePixelRatio||1;const w=W.clientWidth,h=W.clientHeight;C.width=w*dpr;C.height=h*dpr;X.setTransform(dpr,0,0,dpr,0,0);
  U=cl(.85,1.9,Math.min(w,h)/400);LAND=w>h*1.15;bar=0;SIDE=0;HH=50*U;R={};
  cell=Math.min(w/COLS,h/ROWS);ox=(w-cell*COLS)/2;oy=(h-cell*ROWS)/2; // full-bleed map, pills float on top
- const ph=58*U,cs=ph-10*U,pw=3*(cs+8*U)+8*U,br=31*U;
+ const br=31*U,n=KINDS.length,g=6*U;
  R.go=sq(w-br-12*U,h-br-14*U,br);R.fast=LAND?sq(w-br-12*U,h-3*br-24*U,br*.75):sq(w-3*br-26*U,h-br*1.0-14*U,br*.75);
+ const avail=LAND?w-2*br-60*U:R.fast[0]-18*U,cs=Math.min(48*U,(avail-g)/n-g),ph=cs+10*U,pw=n*(cs+g)+g;
  R.pill=[LAND?(w-pw)/2:Math.max(8*U,Math.min((w-pw)/2,R.fast[0]-pw-10*U)),h-ph-12*U,pw,ph];
- ['mg','sn','bar'].forEach((k,i)=>R[k]=[R.pill[0]+8*U+i*(cs+8*U),R.pill[1]+5*U,cs,cs])};
+ KINDS.forEach((k,i)=>R[k]=[R.pill[0]+g+i*(cs+g),R.pill[1]+5*U,cs,cs])};
 bounds=function(){return R};
 drawHUD=function(){const now=performance.now();fxFrame(now);postFrame(now);overlayWorld();const w=W.clientWidth,h=W.clientHeight,fs=Math.round(15*U);
  if(G.paused){const g=X.createRadialGradient(w/2,h/2,Math.min(w,h)*.35,w/2,h/2,Math.max(w,h)*.75);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,10,30,.55)');X.fillStyle=g;X.fillRect(0,0,w,h)}
@@ -367,8 +371,8 @@ tap=function(x,y){const p=[x,y];AUD.unlock();
  if(inR(p,R.sfx)){AUD.sfx=!AUD.sfx;try{localStorage.setItem('td_sfx',AUD.sfx?1:0)}catch(e){}sfx('tap');return}
  if(inR(p,R.menu)){CONFIRM=true;sfx('tap');return}
  if(inR(p,R.zoom)){resetZoom();sfx('tap');return}
- if(['go','mg','sn','bar'].some(k=>inR(p,R[k])))sfx('tap');
- if(inR(p,R.stats)||(inR(p,R.pill)&&!['mg','sn','bar'].some(k=>inR(p,R[k]))))return;
+ if(['go',...KINDS].some(k=>inR(p,R[k])))sfx('tap');
+ if(inR(p,R.stats)||(inR(p,R.pill)&&!KINDS.some(k=>inR(p,R[k]))))return;
  _tap(x,y)};
 // ===================== CYBERPUNK POST FX (preview): bloom+halation, rolling smoke, wet reflections, grit, flicker =====================
 const hash1=n=>{const s=Math.sin(n*127.1)*43758.5453;return s-Math.floor(s)};
@@ -473,7 +477,7 @@ function post2d(now,w,h){const tw=Math.max(16,w/10|0),th=Math.max(16,h/10|0);if(
 // ===================== TOWER LEVELING =====================
 const lvlOf=t=>t.lvl||1,spentOf=t=>t.spent||T[t.k].cost,powMul=l=>Math.pow(1+CFG.UPGRADE_POWER,l-1);
 const upCost=t=>Math.round(T[t.k].cost*CFG.UPGRADE_COST_FRAC);
-const statOf=(t,l)=>t.k=='bar'?BAR_HP*powMul(l):T[t.k].dmg*powMul(l);
+const statOf=(t,l)=>t.k=='gl'?glueSlow(l)*100:t.k=='bar'?BAR_HP*powMul(l):T[t.k].dmg*powMul(l);
 const fmt=v=>Math.abs(v-Math.round(v))<.05?String(Math.round(v)):v.toFixed(1);
 function upgrade(t){if(!t||G.over||G.won)return false;const l=lvlOf(t),c=upCost(t);if(l>=CFG.MAX_TOWER_LEVEL||G.coins<c)return false;
  G.coins-=c;t.spent=spentOf(t)+c;t.lvl=l+1;if(t.k=='bar'){const om=t.max||BAR_HP,nm=statOf(t,t.lvl);t.max=nm;t.hp+=nm-om}
@@ -482,12 +486,13 @@ SFX.levelup=[.5,.1,()=>{[0,.07,.14,.21].forEach((d,i)=>tone('square',mf(72+[0,4,
 // crisp pass after post-processing: mobs + HP bars punch through smoke, level pips, tower popup
 function overlayWorld(){const now=performance.now();
  if(FX.mode=='post'&&FX.q!='off')for(const m of G.mobs)(m.boss?drawBoss:drawMob)(px(m.p[0]),py(m.p[1]),cell,m.hp/m.max,now/120+m.id);
+ if(FX.mode=='post'&&FX.q!='off')gooTint();
  for(const t of[...G.towers,...G.bars]){const l=lvlOf(t);if(l<2)continue;const n=l-1,r=Math.max(2,cell*.06),gap=r*2.6,x0=px(t.x+.5)-(n-1)*gap/2,y=py(t.y+.93);
   X.fillStyle='rgba(0,0,0,.7)';X.beginPath();X.roundRect(x0-r*1.8,y-r*1.8,(n-1)*gap+r*3.6,r*3.6,r*1.8);X.fill();X.fillStyle=l>=CFG.MAX_TOWER_LEVEL?'#ff3cc8':'#ffd84a';for(let i=0;i<n;i++){X.beginPath();X.arc(x0+i*gap,y,r,0,7);X.fill()}}
  G.sellBtn=G.upBtn=null;if(!sel)return;
  const t=sel,l=lvlOf(t),max=l>=CFG.MAX_TOWER_LEVEL,c=upCost(t),can=!max&&G.coins>=c,w=W.clientWidth,h=W.clientHeight;
  const pw=Math.min(w-16,230*U),ph=86*U,sx=px(t.x+.5);let x=cl(8,w-pw-8,sx-pw/2),y=py(t.y)-ph-8*U;if(y<HH+6)y=py(t.y+1)+8*U;y=cl(HH+6,h-ph-80*U,y);
- pill(x,y,pw,ph,.88,T[t.k].col);const nm=t.k=='bar'?'Barricade':T[t.k].name,lab=t.k=='bar'?'HP':'DMG';
+ pill(x,y,pw,ph,.88,T[t.k].col);const nm=t.k=='bar'?'Barricade':T[t.k].name,lab=t.k=='bar'?'HP':t.k=='gl'?'SLOW %':'DMG';
  X.textAlign='left';X.textBaseline='middle';X.fillStyle='#e8f8ff';X.font='800 '+Math.round(13*U)+'px system-ui';X.fillText(nm+'  Lv '+l+(max?' (MAX)':''),x+12*U,y+15*U);
  X.font='600 '+Math.round(12*U)+'px system-ui';X.fillStyle='#9fe';X.fillText(lab+' '+fmt(statOf(t,l))+(max?'':'  →  '+fmt(statOf(t,l+1))),x+12*U,y+33*U);
  const bw=(pw-30*U)/2,bh=34*U,by=y+ph-bh-8*U;G.upBtn=[x+10*U,by,bw,bh];G.sellBtn=[x+20*U+bw,by,bw,bh];
@@ -518,4 +523,57 @@ C.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTo
 C.addEventListener('wheel',e=>{e.preventDefault();zoomAt(rel(e),VIEW.z*Math.exp(-e.deltaY*.0015))},{passive:false});
 fxSetup();
 reset();layout();requestAnimationFrame(loop);checkUpdate();
+// ===================== NEW TOWERS: Glue (slow pulse) + Rocket (splash, min range) =====================
+Object.assign(T,{gl:{name:'Glue Tower',cost:CFG.GLUE.cost,col:'#20ffc0',range:CFG.GLUE.radius},rk:{name:'Rocket Tower',cost:CFG.ROCKET.cost,dmg:CFG.ROCKET.dmg,col:'#ff7a20',range:CFG.ROCKET.range,minRange:CFG.ROCKET.minRange}});
+KINDS.push('gl','rk');Object.assign(LBL,{gl:'Glue',rk:'Rocket'});
+const glueSlow=l=>Math.min(CFG.GLUE.maxSlow,CFG.GLUE.slow*powMul(l)),glueRad=l=>CFG.GLUE.radius*(1+CFG.GLUE.radiusPerLvl*(l-1));
+const rangeOf=t=>t.k=='gl'?glueRad(lvlOf(t)):T[t.k].range;
+const _mm=moveMob;moveMob=function(m,dt){_mm(m,dt*(1-(m.slowT>0?m.slow:0)))};
+function killMob(m){if(m.dead||m._k)return;m._k=1;G.coins+=m.reward;G.kills=(G.kills||0)+1;if(m.boss)G.bossKilled=1;G.fx.push({x:m.p[0],y:m.p[1],c:m.boss?'#c060ff':'#7dff4a',life:m.boss?1.2:.5,max:m.boss?1.2:.5,t:'+'+m.reward})}
+function predict(m,tt){const v=m.v||[0,0];return[m.p[0]+v[0]*tt,m.p[1]+v[1]*tt]}
+const _upd=update;update=function(dt){const all=G.towers,sp=all.filter(t=>t.k=='gl'||t.k=='rk');
+ for(const m of G.mobs)m.pp=[m.p[0],m.p[1]];
+ G.towers=all.filter(t=>!sp.includes(t));try{_upd(dt)}finally{G.towers=all.filter(t=>G.towers.includes(t)||sp.includes(t))}
+ if(G.over||G.won||!dt)return;const RK=CFG.ROCKET,GL=CFG.GLUE;G.rockets=G.rockets||[];G.rings=G.rings||[];
+ for(const m of G.mobs){if(m.pp)m.v=[(m.p[0]-m.pp[0])/dt,(m.p[1]-m.pp[1])/dt];if(m.slowT>0){m.slowT-=dt;if(m.slowT<=0)m.slow=0}}
+ for(const t of sp){t.cd=(t.cd||0)-dt;const cx=t.x+.5,cy=t.y+.5,l=lvlOf(t);
+  if(t.k=='gl'){const r=glueRad(l),inr=G.mobs.filter(m=>m.hp>0&&Math.hypot(m.p[0]-cx,m.p[1]-cy)<=r);if(t.cd<=0&&inr.length){t.cd=GL.period;t.fl=performance.now();G.rings.push({x:cx,y:cy,r,life:.7,max:.7});sfx('glue');
+    const s=glueSlow(l);for(const m of inr){const e=s*(m.boss?GL.bossMul:1);if(!(m.slowT>0)||e>=m.slow)m.slow=e;m.slowT=GL.dur;if(GL.dmg){m.hp-=GL.dmg;if(m.hp<=0)killMob(m)}}}}
+  else{let best=null,bd=1e9;for(const m of G.mobs){const d=Math.hypot(m.p[0]-cx,m.p[1]-cy),r=remaining(m);if(m.hp>0&&d<=RK.range&&d>=RK.minRange&&r<bd){bd=r;best=m}}
+   if(best){let aim=best.p;for(let i=0;i<3;i++){const tt=Math.hypot(aim[0]-cx,aim[1]-cy)/RK.speed;aim=predict(best,tt)}t.ang=Math.atan2(aim[1]-cy,aim[0]-cx);
+    if(t.cd<=0){t.cd=RK.period;t.fl=performance.now();const d=Math.hypot(aim[0]-cx,aim[1]-cy)||1e-3;G.rockets.push({x:cx,y:cy,sx:cx,sy:cy,tx:aim[0],ty:aim[1],d,tr:0,tgt:best,dmg:RK.dmg*powMul(l),trail:[]});sfx('launch')}}}}
+ for(const k of G.rockets){const step=RK.speed*dt;k.tr+=step;const f=Math.min(1,k.tr/k.d);k.x=k.sx+(k.tx-k.sx)*f;k.y=k.sy+(k.ty-k.sy)*f;k.trail.push([k.x,k.y,.6]);
+  if(f>=1){k.done=1;let hits=0;for(const m of G.mobs){if(m.hp<=0)continue;const dd=Math.hypot(m.p[0]-k.x,m.p[1]-k.y);if(dd<=RK.splash+(m.boss?.3:0)){m.hp-=m==k.tgt&&dd<=RK.splash?k.dmg:k.dmg*RK.splashFrac;hits++;if(m.hp<=0)killMob(m)}}
+   G.lastBoom={hits,x:k.x,y:k.y};G.fx.push({x:k.x,y:k.y,c:'#ff9a30',life:.55,max:.55,boom:1});sfx('boom');
+   if(FX.q!='off'){const x=px(k.x),y=py(k.y),hi=FX.q=='high';spark(x,y,'#ffd070',hi?34:12,3.2,.6,.05);spark(x,y,'#ff5a20',hi?20:8,2,.8,.07);PF.glitch=Math.max(PF.glitch||0,.12)}}}
+ G.rockets=G.rockets.filter(k=>!k.done);for(const k of G.rockets.concat(G.fx.filter(f=>f.trail)))for(const p of k.trail)p[2]-=dt;
+ for(const k of G.rockets)k.trail=k.trail.filter(p=>p[2]>0).slice(-40);
+ for(const r of G.rings)r.life-=dt;G.rings=G.rings.filter(r=>r.life>0);G.mobs=G.mobs.filter(m=>m.hp>0)};
+// art
+const _dt2=drawTower;drawTower=function(k,x,y,s,ang,flash){if(k!='gl'&&k!='rk')return _dt2(k,x,y,s,ang,flash);const c=T[k].col;X.save();if(s===cell)X.globalAlpha*=flick(x,y);X.translate(x,y);
+ X.fillStyle='#141a33';glow(c,s*.3);X.strokeStyle=c;X.lineWidth=s*.06;
+ if(k=='gl'){X.beginPath();X.roundRect(-s*.38,-s*.38,s*.76,s*.76,s*.16);X.fill();X.stroke();const p=(performance.now()/600)%1;X.globalAlpha*=.9;X.fillStyle='#0a3';X.beginPath();X.arc(0,0,s*.22,0,7);X.fill();
+  X.fillStyle=c;X.beginPath();for(let i=0;i<10;i++){const a=i*.628,rr=s*(.15+.03*Math.sin(i*2.3+p*6.28));X.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}X.closePath();X.fill();
+  X.fillStyle='#eafff8';X.beginPath();X.arc(-s*.05,-s*.05,s*.04,0,7);X.fill();if(flash){X.strokeStyle='#bfffe8';X.lineWidth=s*.04;X.beginPath();X.arc(0,0,s*.33,0,7);X.stroke()}}
+ else{X.beginPath();for(let i=0;i<8;i++)X.lineTo(Math.cos(i*Math.PI/4+Math.PI/8)*s*.42,Math.sin(i*Math.PI/4+Math.PI/8)*s*.42);X.closePath();X.fill();X.stroke();X.rotate(ang);
+  X.fillStyle=c;X.fillRect(-s*.05,-s*.17,s*.42,s*.12);X.fillRect(-s*.05,s*.05,s*.42,s*.12);X.fillStyle='#ffe0b0';X.fillRect(s*.3,-s*.15,s*.08,s*.08);X.fillRect(s*.3,s*.07,s*.08,s*.08);
+  X.fillStyle=c;X.beginPath();X.arc(-s*.08,0,s*.13,0,7);X.fill();if(flash){glow('#fff0a0',s*.4);X.fillStyle='#fff0a0';X.beginPath();X.arc(s*.46,0,s*.12,0,7);X.fill()}}
+ X.restore();X.shadowBlur=0};
+function drawExtra(now){
+ for(const r of G.rings||[]){const f=1-r.life/r.max;X.globalAlpha=Math.max(0,r.life/r.max)*.9;glow('#20ffc0',14);X.strokeStyle='#40ffd0';X.lineWidth=Math.max(2,cell*.09*(1-f*.6));X.beginPath();X.arc(px(r.x),py(r.y),r.r*cell*(.25+.75*f),0,7);X.stroke();
+  X.fillStyle='rgba(32,255,192,'+(.12*(1-f))+')';X.fill();X.globalAlpha=1;X.shadowBlur=0}
+ for(const k of G.rockets||[]){for(const p of k.trail){const a=p[2]/.6;X.fillStyle='rgba(170,170,190,'+(a*.35)+')';X.beginPath();X.arc(px(p[0]),py(p[1]),cell*(.08+.14*(1-a)),0,7);X.fill()}
+  const a=Math.atan2(k.ty-k.sy,k.tx-k.sx);X.save();X.translate(px(k.x),py(k.y));X.rotate(a);glow('#ff7a20',12);X.fillStyle='#ffd0a0';X.fillRect(-cell*.14,-cell*.045,cell*.26,cell*.09);X.fillStyle='#ff5a20';X.beginPath();X.moveTo(-cell*.14,0);X.lineTo(-cell*.3,-cell*.06);X.lineTo(-cell*.3,cell*.06);X.fill();X.restore();X.shadowBlur=0}
+ for(const f of G.fx)if(f.boom){const q=f.life/f.max;X.globalAlpha=q;glow('#ff9a30',24);X.fillStyle='rgba(255,180,80,'+(q*.5)+')';X.beginPath();X.arc(px(f.x),py(f.y),cell*CFG.ROCKET.splash*(1-q*.6),0,7);X.fill();X.globalAlpha=1;X.shadowBlur=0}}
+function gooTint(){const now=performance.now();for(const m of G.mobs){if(!(m.slowT>0))continue;const x=px(m.p[0]),y=py(m.p[1]),r=cell*(m.boss?.45:.3);X.save();X.globalAlpha=.35+.35*Math.min(1,m.slowT);X.fillStyle='rgba(32,255,170,.45)';X.strokeStyle='#30ffc0';X.lineWidth=Math.max(1.5,cell*.03);
+  X.beginPath();for(let i=0;i<12;i++){const a=i*.5236,rr=r*(1+.12*Math.sin(i*3+now/150+m.id));X.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}X.closePath();X.fill();X.stroke();
+  for(let i=0;i<2;i++){const ph=((now/700+i*.5+m.id*.13)%1);X.fillStyle='#30ffc0';X.beginPath();X.arc(x+(i?r*.4:-r*.35),y+r*.6+ph*r*1.1,cell*.035*(1-ph*.5),0,7);X.fill()}X.restore()}}
+// rocket smoke + boom light into fog
+const _fxl=fxLights;fxLights=function(){const L=_fxl(),add=(gx,gy,r,i,c)=>L.unshift([px(gx),py(gy),r*cell,i,c]);
+ for(const k of G.rockets||[])add(k.x,k.y,1.3,.9,'#ff8a30');for(const f of G.fx)if(f.boom)add(f.x,f.y,3.6,2.2*f.life/f.max,'#ff9a30');
+ for(const r of G.rings||[])add(r.x,r.y,r.r*1.2,.8*r.life/r.max,'#20ffc0');return L.slice(0,FXP[FX.q].lights)};
+SFX.glue=[.4,.12,()=>{tone('sine',180,90,.35,.12,0,0,900);nz(.25,.05,'lowpass',500)}];
+SFX.launch=[.4,.1,()=>{nz(.45,.18,'bandpass',1400);tone('sawtooth',300,900,.3,.06,0,0,2000)}];
+SFX.boom=[.6,.08,()=>{nz(.7,.35,'lowpass',420);tone('sine',90,35,.6,.3)}];
+layout();
 </script></body></html>
