@@ -27,6 +27,7 @@ const CFG={
  MAX_TOWER_LEVEL:5, UPGRADE_COST_FRAC:0.25, UPGRADE_POWER:0.25, // upgrade = round(cost*0.25); +25% power per level, compounding
  MAX_ZOOM:3,
  GLUE:{cost:250,period:1.5,radius:1.8,radiusPerLvl:0.05,slow:0.4,maxSlow:0.7,dur:2,bossMul:0.5,dmg:0},
+ CANNON:{cost:300,dmg:40,range:4.5,period:1.2,speed:9,hitR:0.35}, // piercing ball: hits every mob on its line once
  ROCKET:{cost:500,dmg:150,range:6.5,minRange:1.8,splash:1,splashFrac:0.6,period:2,speed:7},      // level length; wave 10 is the boss wave
  START_COINS:500, START_LIVES:20,
  MOB_HP:50,           // base mob HP (wave 1)
@@ -246,7 +247,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261014024316';
+const APP_VERSION='20261014111014';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
@@ -376,7 +377,8 @@ layout=function(){dpr=window.devicePixelRatio||1;const w=W.clientWidth,h=W.clien
  R.go=sq(w-br-12*U,h-br-14*U,br);R.fast=LAND?sq(w-br-12*U,h-3*br-24*U,br*.75):sq(w-3*br-26*U,h-br*1.0-14*U,br*.75);
  if(LAND){const top=8*U,cs=Math.min(48*U,(h-top-8*U-g)/n-g),pw=cs+2*g,ph=n*(cs+g)+g;R.pill=[8*U,Math.max(top,(h-ph)/2),pw,ph];KINDS.forEach((k,i)=>R[k]=[R.pill[0]+g,R.pill[1]+g+i*(cs+g),cs,cs]);
   VL=R.pill[0]+pw+8*U;VR=2*br+20*U}
- else{const avail=R.fast[0]-18*U,cs=Math.min(48*U,(avail-g)/n-g),ph=cs+10*U,pw=n*(cs+g)+g;R.pill=[Math.max(8*U,Math.min((w-pw)/2,R.fast[0]-pw-10*U)),h-ph-12*U,pw,ph];KINDS.forEach((k,i)=>R[k]=[R.pill[0]+g+i*(cs+g),R.pill[1]+5*U,cs,cs]);VL=VR=0}
+ else{const avail=R.fast[0]-18*U;let rows=1,cols=n,cs=Math.min(48*U,(avail-g)/n-g);if(cs<40*U){rows=2;cols=Math.ceil(n/2);cs=Math.min(46*U,(avail-g)/cols-g)}
+  const pw=cols*(cs+g)+g,ph=rows*(cs+g)+g+4*U;R.pill=[Math.max(8*U,Math.min((w-pw)/2,R.fast[0]-pw-10*U)),h-ph-12*U,pw,ph];KINDS.forEach((k,i)=>R[k]=[R.pill[0]+g+(i%cols)*(cs+g),R.pill[1]+g+2*U+Math.floor(i/cols)*(cs+g),cs,cs]);VL=VR=0}
  cell=Math.min((w-VL-VR)/COLS,h/ROWS);ox=VL+(w-VL-VR-cell*COLS)/2;oy=(h-cell*ROWS)/2}; // map fits between the side columns; pills float on top
 bounds=function(){return R};
 drawHUD=function(){const now=performance.now();fxFrame(now);postFrame(now);overlayWorld();const w=W.clientWidth,h=W.clientHeight,fs=Math.round(15*U);
@@ -509,7 +511,7 @@ function post2d(now,w,h){const tw=Math.max(16,w/10|0),th=Math.max(16,h/10|0);if(
 // ===================== TOWER LEVELING =====================
 const lvlOf=t=>t.lvl||1,spentOf=t=>t.spent||T[t.k].cost,powMul=l=>Math.pow(1+CFG.UPGRADE_POWER,l-1);
 const upCost=t=>Math.round(T[t.k].cost*CFG.UPGRADE_COST_FRAC);
-const statOf=(t,l)=>t.k=='gl'?glueSlow(l)*100:t.k=='bar'?BAR_HP*powMul(l):T[t.k].dmg*powMul(l);
+const statOf=(t,l)=>t.k=='cn'?CFG.CANNON.dmg*powMul(l):t.k=='gl'?glueSlow(l)*100:t.k=='bar'?BAR_HP*powMul(l):T[t.k].dmg*powMul(l);
 const fmt=v=>Math.abs(v-Math.round(v))<.05?String(Math.round(v)):v.toFixed(1);
 function upgrade(t){if(!t||G.over||G.won)return false;const l=lvlOf(t),c=upCost(t);if(l>=CFG.MAX_TOWER_LEVEL||G.coins<c)return false;
  G.coins-=c;t.spent=spentOf(t)+c;t.lvl=l+1;if(t.k=='bar'){const om=t.max||BAR_HP,nm=statOf(t,t.lvl);t.max=nm;t.hp+=nm-om}
@@ -518,12 +520,12 @@ SFX.levelup=[.5,.1,()=>{[0,.07,.14,.21].forEach((d,i)=>tone('square',mf(72+[0,4,
 // crisp pass after post-processing: mobs + HP bars punch through smoke, level pips, tower popup
 function overlayWorld(){const now=performance.now();
  if(FX.mode=='post'&&FX.q!='off')for(const m of G.mobs)(m.boss?drawBoss:drawMob)(px(m.p[0]),py(m.p[1]),cell,m.hp/m.max,now/120+m.id);
- if(FX.mode=='post'&&FX.q!='off')gooTint();
+ if(FX.mode=='post'&&FX.q!='off'){gooTint();if(typeof drawBalls=='function')drawBalls()}
  for(const t of[...G.towers,...G.bars]){const l=lvlOf(t);if(l<2)continue;const n=l-1,r=Math.max(2,cell*.06),gap=r*2.6,x0=px(t.x+.5)-(n-1)*gap/2,y=py(t.y+.93);
   X.fillStyle='rgba(0,0,0,.7)';X.beginPath();X.roundRect(x0-r*1.8,y-r*1.8,(n-1)*gap+r*3.6,r*3.6,r*1.8);X.fill();X.fillStyle=l>=CFG.MAX_TOWER_LEVEL?'#ff3cc8':'#ffd84a';for(let i=0;i<n;i++){X.beginPath();X.arc(x0+i*gap,y,r,0,7);X.fill()}}
  G.sellBtn=G.upBtn=null;if(!sel)return;
  const t=sel,l=lvlOf(t),max=l>=CFG.MAX_TOWER_LEVEL,c=upCost(t),can=!max&&G.coins>=c,w=W.clientWidth,h=W.clientHeight;
- const pw=Math.min(w-16,230*U),ph=86*U,sx=px(t.x+.5);let x=cl(VL||8,w-pw-(VR||8),sx-pw/2),y=py(t.y)-ph-8*U;if(y<HH+6)y=py(t.y+1)+8*U;y=cl(HH+6,h-ph-80*U,y);
+ const pw=Math.min(w-16,230*U),ph=86*U,sx=px(t.x+.5);let x=cl(VL||8,w-pw-(VR||8),sx-pw/2),y=py(t.y)-ph-8*U;if(y<HH+6)y=py(t.y+1)+8*U;y=cl(HH+6,(LAND?h-8*U:R.pill[1]-8*U)-ph,y);
  pill(x,y,pw,ph,.88,T[t.k].col);const nm=t.k=='bar'?'Barricade':T[t.k].name,lab=t.k=='bar'?'HP':t.k=='gl'?'SLOW %':'DMG';
  X.textAlign='left';X.textBaseline='middle';X.fillStyle='#e8f8ff';X.font='800 '+Math.round(13*U)+'px system-ui';X.fillText(nm+'  Lv '+l+(max?' (MAX)':''),x+12*U,y+15*U);
  X.font='600 '+Math.round(12*U)+'px system-ui';X.fillStyle='#9fe';X.fillText(lab+' '+fmt(statOf(t,l))+(max?'':'  →  '+fmt(statOf(t,l+1))),x+12*U,y+33*U);
@@ -607,5 +609,30 @@ const _fxl=fxLights;fxLights=function(){const L=_fxl(),add=(gx,gy,r,i,c)=>L.unsh
 SFX.glue=[.4,.12,()=>{tone('sine',180,90,.35,.12,0,0,900);nz(.25,.05,'lowpass',500)}];
 SFX.launch=[.4,.1,()=>{nz(.45,.18,'bandpass',1400);tone('sawtooth',300,900,.3,.06,0,0,2000)}];
 SFX.boom=[.6,.08,()=>{nz(.7,.35,'lowpass',420);tone('sine',90,35,.6,.3)}];
+layout();
+// ===================== CANNON: piercing ball, hits each mob once per shot =====================
+T.cn={name:'Cannon',cost:CFG.CANNON.cost,dmg:CFG.CANNON.dmg,col:'#ff4fd8',range:CFG.CANNON.range};KINDS.push('cn');LBL.cn='Cannon';
+const _upd3=update;update=function(dt){const all=G.towers,cn=all.filter(t=>t.k=='cn');G.towers=all.filter(t=>t.k!='cn');try{_upd3(dt)}finally{G.towers=all.filter(t=>G.towers.includes(t)||cn.includes(t))}
+ if(G.over||G.won||!dt)return;const CN=CFG.CANNON;G.balls=G.balls||[];
+ for(const t of cn){t.cd=(t.cd||0)-dt;const cx=t.x+.5,cy=t.y+.5;let best=null,bd=1e9;for(const m of G.mobs){const d=Math.hypot(m.p[0]-cx,m.p[1]-cy),r=remaining(m);if(m.hp>0&&d<=CN.range&&r<bd){bd=r;best=m}}
+  if(!best)continue;let aim=best.p;for(let i=0;i<3;i++){const tt=Math.hypot(aim[0]-cx,aim[1]-cy)/CN.speed;aim=predict(best,tt)}const a=Math.atan2(aim[1]-cy,aim[0]-cx);t.ang=a;
+  if(t.cd<=0){t.cd=CN.period;t.fl=performance.now();G.shotsFired=(G.shotsFired||0)+1;G.balls.push({x:cx,y:cy,dx:Math.cos(a),dy:Math.sin(a),tr:0,dmg:CN.dmg*powMul(lvlOf(t)),hit:new Set(),trail:[],id:G.shotsFired});sfx('cannon')}}
+ for(const b of G.balls){const step=CN.speed*dt,n=Math.max(1,Math.ceil(step/.1));for(let s=0;s<n&&!b.done;s++){const d=Math.min(step/n,CN.range-b.tr);b.x+=b.dx*d;b.y+=b.dy*d;b.tr+=d;
+   for(const m of G.mobs){if(m.hp<=0||b.hit.has(m.id))continue;if(Math.hypot(m.p[0]-b.x,m.p[1]-b.y)<=CN.hitR+(m.boss?.25:0)){b.hit.add(m.id);m.hp-=b.dmg;(m.hitBy=m.hitBy||{})[b.id]=(m.hitBy[b.id]||0)+1;sfx('thud');
+     if(FX.q!='off')spark(px(m.p[0]),py(m.p[1]),'#ffb0f0',FX.q=='high'?12:5,2.2,.3,.035,Math.atan2(b.dy,b.dx),1.6);if(m.hp<=0)killMob(m)}}
+   if(b.tr>=CN.range-1e-6)b.done=1}b.trail.push([b.x,b.y]);if(b.trail.length>8)b.trail.shift()}
+ G.balls=G.balls.filter(b=>!b.done);G.mobs=G.mobs.filter(m=>m.hp>0)};
+const _dt3=drawTower;drawTower=function(k,x,y,s,ang,flash){if(k!='cn')return _dt3(k,x,y,s,ang,flash);const c=T.cn.col;X.save();if(s===cell)X.globalAlpha*=flick(x,y);X.translate(x,y);
+ X.fillStyle='#141a33';glow(c,s*.3);X.strokeStyle=c;X.lineWidth=s*.06;X.beginPath();X.arc(0,0,s*.4,0,7);X.fill();X.stroke();
+ X.fillStyle='rgba(255,79,216,.25)';for(let i=0;i<4;i++){X.beginPath();X.arc(Math.cos(i*1.571+.785)*s*.3,Math.sin(i*1.571+.785)*s*.3,s*.045,0,7);X.fill()}
+ X.rotate(ang);X.fillStyle='#2a1030';X.strokeStyle=c;X.lineWidth=s*.05;X.beginPath();X.roundRect(-s*.05,-s*.15,s*.52,s*.3,s*.06);X.fill();X.stroke();X.fillStyle=c;X.fillRect(s*.38,-s*.18,s*.1,s*.36);
+ glow('#fff',s*.3);X.fillStyle='#ffe0fa';X.beginPath();X.arc(0,0,s*.16,0,7);X.fill();X.fillStyle='#fff';X.beginPath();X.arc(0,0,s*.08,0,7);X.fill();
+ if(flash){glow('#ffd0f8',s*.5);X.fillStyle='#ffd0f8';X.beginPath();X.arc(s*.56,0,s*.15,0,7);X.fill()}X.restore();X.shadowBlur=0};
+function drawBalls(){for(const b of G.balls||[]){const tr=b.trail;if(tr.length>1){X.save();X.lineCap='round';glow('#ff4fd8',12);for(let i=1;i<tr.length;i++){X.strokeStyle='rgba(255,120,230,'+(i/tr.length*.7)+')';X.lineWidth=cell*.16*(i/tr.length);X.beginPath();X.moveTo(px(tr[i-1][0]),py(tr[i-1][1]));X.lineTo(px(tr[i][0]),py(tr[i][1]));X.stroke()}X.restore()}
+ glow('#ff4fd8',16);X.fillStyle='#fff';X.beginPath();X.arc(px(b.x),py(b.y),cell*.16,0,7);X.fill();X.strokeStyle='#ff4fd8';X.lineWidth=Math.max(2,cell*.06);X.stroke();X.shadowBlur=0}}
+const _dx3=drawExtra;drawExtra=function(now){_dx3(now);drawBalls()};
+const _fxl3=fxLights;fxLights=function(){const L=_fxl3();for(const b of G.balls||[])L.unshift([px(b.x),py(b.y),1.4*cell,1.1,'#ff4fd8']);return L.slice(0,FXP[FX.q].lights)};
+SFX.cannon=[.5,.15,()=>{nz(.35,.3,'lowpass',700);tone('sine',140,45,.3,.25)}];
+SFX.thud=[.25,.08,()=>{tone('sine',120,60,.12,.15);nz(.08,.08,'lowpass',900)}];
 layout();
 </script></body></html>
