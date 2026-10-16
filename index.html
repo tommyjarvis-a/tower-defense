@@ -247,7 +247,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261015235955';
+const APP_VERSION='20261016000618';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
@@ -455,7 +455,7 @@ uniform float uSD;void main(){vec2 p=vec2(vUV.x*uAsp,vUV.y)*1.55;float t=uT*.07;
  vec3 li=texture(uA,vUV).rgb*2.6;
  for(int i=0;i<24;i++){if(i>=uN)break;vec2 dd=(vUV-uL[i].xy)*vec2(uAsp,1.);float rr=uL[i].z;li+=uC[i]*uL[i].w*1.6/(1.+dot(dd,dd)/(rr*rr)*3.)*exp(-dot(dd,dd)/(rr*rr*6.));}
  vec3 base=vec3(.2,.21,.25)*(.8+.4*d);vec3 lc=li*1.1;lc=lc/(1.+lc*1.4);o=vec4(min((base+lc)*den,vec3(.45)),den*.85);}`,
-comp:HDR+`uniform sampler2D uB,uW,uK;uniform float uT,uG,uCA,uScan,uRefl;uniform vec2 uRes;
+comp:HDR+`uniform sampler2D uB,uW,uK;uniform float uT,uG,uCA,uScan,uRefl,uBl,uSL;uniform vec2 uRes;
 void main(){vec2 uv=vUV;float ft=floor(uT*24.);
  if(uG>.01){float band=floor(uv.y*34.);float r=hs(vec2(band,ft));if(r<uG*.3)uv.x+=(hs(vec2(band,ft+3.))-.5)*.05*uG;}
  vec2 c=uv-.5;float r2=dot(c,c);vec2 ca=c*r2*.03*uCA+vec2(uG*.004,0);
@@ -464,10 +464,10 @@ void main(){vec2 uv=vUV;float ft=floor(uT*24.);
  vec3 rf=vec3(0);float n=uRefl;for(int i=1;i<=10;i++){if(float(i)>n)break;float d=float(i)*.016;float rip=(ns(vec2(uv.y*90.-uT*2.,float(i)))-.5)*.014+(ns(vec2(uv.x*40.,uv.y*160.+uT))-.5)*.006;rf+=texture(uB,vec2(uv.x+rip,uv.y+d)).rgb*(1.-float(i)/(n+1.));}
  col+=rf*(2.6/n)*vec3(.8,.95,1.15)*(.6+.4*ns(uv*vec2(30.,4.)+uT*.2));
  vec3 b=vec3(texture(uB,uv+c*.007).r,texture(uB,uv).g,texture(uB,uv-c*.007).b);vec3 w=texture(uW,uv).rgb;
- col+=b*.75+w*vec3(.8,.3,.2)*.75;
+ col+=(b*.75+w*vec3(.8,.3,.2)*.75)*uBl;
  col=max(col-.006,0.)*1.04;col=pow(col,vec3(1.02));
  float l=dot(col,vec3(.299,.587,.114));col=mix(col*vec3(.9,1.,1.05)+vec3(.01,.016,.024),col,smoothstep(.0,.35,l));col+=vec3(.05,-.015,.045)*smoothstep(.35,1.,l);
- col*=1.-r2*.5;col*=.955+.045*sin(gl_FragCoord.y*3.14159/uScan);col+=(hs(gl_FragCoord.xy+fract(uT*7.)*311.)-.5)*.055;
+ col*=1.-r2*.5;col*=1.-uSL*(.045-.045*sin(gl_FragCoord.y*3.14159/uScan));col+=(hs(gl_FragCoord.xy+fract(uT*7.)*311.)-.5)*.055;
  o=vec4(col,1);}`};
 function postInit(gl){const sh=(t,s)=>{const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(x));return x};const vs=sh(gl.VERTEX_SHADER,VS);
  PF.p={};for(const k in FS){const p=gl.createProgram();gl.attachShader(p,vs);gl.attachShader(p,sh(gl.FRAGMENT_SHADER,FS[k]));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
@@ -494,7 +494,7 @@ function postFrame(now){if(FX.q=='off'||G==null)return;const w=W.clientWidth,h=W
  const wide=B[Math.min(3,Q.mips-1)];
  const L=fxLights();L.forEach(([x,y,r,i,c],k)=>{PF.L.set([x/w,1-y/h,r/h,i],k*4);PF.Cc.set(rgb(c),k*3)});
  const K=rt(gl,'smoke',w*Q.smoke,h*Q.smoke);pass(gl,'smoke',K,wide,{uT:FX.t,uAsp:w/h,uN:L.length,uO:Q.oct,uL:PF.L,uC:PF.Cc,uSD:CFG.SMOKE_DENSITY});
- pass(gl,'comp',null,sc,{uB:u,uW:wide,uK:K,uT:FX.t,uG:PF.glitch,uCA:Q.ca,uScan:Math.max(1.5,ps*1.5),uRefl:Q.refl,uRes:[ow,oh]});
+ pass(gl,'comp',null,sc,{uB:u,uW:wide,uK:K,uT:FX.t,uG:PF.glitch,uCA:Q.ca,uScan:Math.max(1.5,ps*1.5),uRefl:Q.refl,uRes:[ow,oh],uBl:OPTS.bloom/100,uSL:OPTS.scan/100});
  FX.frames++;X.save();X.setTransform(1,0,0,1,0,0);X.clearRect(0,0,C.width,C.height);X.restore()}
 // ---------- Canvas2D fallback approximation ----------
 function post2dInit(){const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};PF.tb=mk(64,64);PF.tbx=PF.tb.getContext('2d');
@@ -503,11 +503,11 @@ function post2dInit(){const mk=(w,h)=>{const c=document.createElement('canvas');
  const sl=mk(1,3),sl2=sl.getContext('2d');sl2.fillStyle='rgba(0,0,0,.18)';sl2.fillRect(0,2,1,1);PF.scan=X.createPattern(sl,'repeat')}
 function post2d(now,w,h){const tw=Math.max(16,w/10|0),th=Math.max(16,h/10|0);if(PF.tb.width!=tw||PF.tb.height!=th){PF.tb.width=tw;PF.tb.height=th}PF.tbx.clearRect(0,0,tw,th);PF.tbx.drawImage(C,0,0,tw,th);
  X.save();X.imageSmoothingEnabled=true;const s=Math.max(w,h)*1.4,o=(FX.t*8)%(s*.3);X.globalAlpha=Math.min(.6,.45*CFG.SMOKE_DENSITY);X.drawImage(PF.smoke,-o,-s*.15,s,s);X.globalAlpha=.22;X.drawImage(PF.smoke,-s*.3+o*.7,-s*.05,s,s);
- X.globalCompositeOperation='lighter';X.globalAlpha=.55;X.drawImage(PF.tb,0,0,w,h);X.globalAlpha=.25;X.drawImage(PF.tb,-w*.03,-h*.03,w*1.06,h*1.06);
+ X.globalCompositeOperation='lighter';const BL=OPTS.bloom/100;X.globalAlpha=Math.min(1,.55*BL);X.drawImage(PF.tb,0,0,w,h);X.globalAlpha=Math.min(1,.25*BL);X.drawImage(PF.tb,-w*.03,-h*.03,w*1.06,h*1.06);
  X.globalAlpha=.16;X.drawImage(PF.tb,0,h*.02,w,h*1.07);X.globalCompositeOperation='source-over';
  if(PF.glitch>.05)for(let i=0;i<4;i++){if(Math.random()>PF.glitch)continue;const y=Math.random()*h,bh=4+Math.random()*12;X.globalAlpha=1;X.drawImage(C,0,y*dpr,C.width,bh*dpr,(Math.random()-.5)*20*PF.glitch,y,w,bh)}
  const g=X.createRadialGradient(w/2,h/2,Math.min(w,h)*.3,w/2,h/2,Math.max(w,h)*.75);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,8,14,.6)');X.globalAlpha=1;X.fillStyle=g;X.fillRect(0,0,w,h);
- X.fillStyle=PF.scan;X.fillRect(0,0,w,h);X.globalAlpha=.05;X.drawImage(PF.grain,-Math.random()*64,-Math.random()*64,w+128,h+128);X.restore();FX.frames++}
+ X.globalAlpha=Math.min(1,OPTS.scan/100);X.fillStyle=PF.scan;X.fillRect(0,0,w,h);X.globalAlpha=1;X.globalAlpha=.05;X.drawImage(PF.grain,-Math.random()*64,-Math.random()*64,w+128,h+128);X.restore();FX.frames++}
 // ===================== TOWER LEVELING =====================
 const lvlOf=t=>t.lvl||1,spentOf=t=>t.spent||T[t.k].cost,powMul=l=>Math.pow(1+CFG.UPGRADE_POWER,l-1);
 const upCost=t=>Math.round(T[t.k].cost*CFG.UPGRADE_COST_FRAC);
@@ -637,11 +637,18 @@ SFX.thud=[.25,.08,()=>{tone('sine',120,60,.12,.15);nz(.08,.08,'lowpass',900)}];
 layout();
 // ===================== TITLE SCREEN + OPTIONS + AUTOSAVE (v1) =====================
 const SAVE_KEY='td_save_v1',OPT_KEY='td_opts_v1';
-const OPT_DEF={master:100,music:100,sfx:100,shake:true,fps:false};
-const OPTS=(()=>{let o={};try{o=JSON.parse(localStorage.getItem(OPT_KEY)||'{}')||{}}catch(e){o={}}const r={...OPT_DEF};
- for(const k of['master','music','sfx'])if(typeof o[k]=='number'&&o[k]>=0&&o[k]<=100)r[k]=Math.round(o[k]/10)*10;for(const k of['shake','fps'])if(typeof o[k]=='boolean')r[k]=o[k];return r})();
+const SL={master:['Master volume',0,100,100,'a'],music:['Music volume',0,100,100,'a'],sfx:['SFX volume',0,100,100,'a'],
+ bloom:['Bloom / glow',0,200,100,'v'],sat:['Color saturation',0,200,100,'v'],fog:['Fog / smoke',0,200,100,'v'],haze:['Neon haze / vignette',0,100,0,'v'],bright:['Brightness',50,150,100,'v'],scan:['Scanlines / CRT',0,200,100,'v'],parts:['Particle density',0,200,100,'v']};
+const TG={shake:['Screen shake / glitch',true],fps:['Show FPS',false]};
+const OPT_DEF={};for(const k in SL)OPT_DEF[k]=SL[k][3];for(const k in TG)OPT_DEF[k]=TG[k][1];
+const OPTS=(()=>{let o={};try{o=JSON.parse(localStorage.getItem(OPT_KEY)||'{}')||{}}catch(e){o={}}if(typeof o!='object')o={};const r={...OPT_DEF}; // unknown/missing/out-of-range keys fall back to defaults (migrates older td_opts_v1)
+ for(const k in SL)if(typeof o[k]=='number'&&isFinite(o[k]))r[k]=Math.round(cl(SL[k][1],SL[k][2],o[k]));for(const k in TG)if(typeof o[k]=='boolean')r[k]=o[k];return r})();
 const BASE_MUS=CFG.MUSIC_VOL,BASE_SFX=CFG.SFX_VOL;
-function applyOpts(){CFG.MUSIC_VOL=BASE_MUS*OPTS.music/100;CFG.SFX_VOL=BASE_SFX*OPTS.sfx/100;if(AUD.ctx){AUD.master.gain.value=OPTS.master/100;AUD.sg.gain.value=CFG.SFX_VOL}}
+const HZ=document.createElement('div');HZ.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:2;opacity:0;display:none;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 35%,rgba(120,0,160,.35) 75%,rgba(10,0,30,.85) 100%),linear-gradient(180deg,rgba(0,240,255,.10),rgba(255,60,200,.10))';W.appendChild(HZ);
+function applyVis(){const f=(OPTS.sat!=100?'saturate('+OPTS.sat/100+') ':'')+(OPTS.bright!=100?'brightness('+OPTS.bright/100+')':'');W.style.filter=f.trim();
+ CFG.SMOKE_DENSITY=OPTS.fog/100;HZ.style.opacity=OPTS.haze/100;HZ.style.display=OPTS.haze>0?'block':'none'}
+function applyOpts(){CFG.MUSIC_VOL=BASE_MUS*OPTS.music/100;CFG.SFX_VOL=BASE_SFX*OPTS.sfx/100;if(AUD.ctx){AUD.master.gain.value=OPTS.master/100;AUD.sg.gain.value=CFG.SFX_VOL}applyVis()}
+const _spark=spark;spark=function(x,y,c,n,...a){const m=n*OPTS.parts/100,k=Math.floor(m)+(Math.random()<m%1?1:0);if(k>0)_spark(x,y,c,k,...a)};
 function saveOpts(){try{localStorage.setItem(OPT_KEY,JSON.stringify(OPTS))}catch(e){}applyOpts()}
 const _unlock=AUD.unlock;AUD.unlock=function(){_unlock.call(AUD);applyOpts()};applyOpts();
 // screen glitch/shake toggle: glitch reads as 0 when disabled
@@ -670,8 +677,8 @@ const _adv=advance;advance=function(dt){if(SCREEN)return;const was=G.active,ov=G
 function title(cx,y,t,col,sz){X.textAlign='center';X.textBaseline='middle';X.fillStyle=col;glow(col,18*U);X.font='800 '+Math.round(sz)+'px system-ui';X.fillText(t,cx,y);X.shadowBlur=0}
 function drawScreens(now){UI=[];const w=W.clientWidth,h=W.clientHeight;
  if(OPTS.fps){FPS.n++;if(now-FPS.t>500){FPS.v=Math.round(FPS.n*1000/(now-FPS.t));FPS.n=0;FPS.t=now}X.fillStyle='#7dff4a';X.font='700 '+Math.round(11*U)+'px system-ui';X.textAlign='left';X.textBaseline='top';X.fillText(FPS.v+' FPS',6,6)}
- if(!SCREEN&&G.paused&&!G.over&&!G.won){const bw=110*U,bh=34*U,y=8*U+36*U+(CONFIRM?60:8)*U+34*U;
-  R.opt=[w/2-bw-5*U,y,bw,bh];R.ttl=[w/2+5*U,y,bw,bh];btn(...R.opt,'⚙ Options','#00f0ff',false,false);btn(...R.ttl,'⌂ Title','#ff3cc8',false,false)}else R.opt=R.ttl=null;
+ R.opt=R.ttl=null;
+
  if(!SCREEN)return;
  X.fillStyle='rgba(4,6,16,.82)';X.fillRect(0,0,w,h);const g=X.createRadialGradient(w/2,h/2,Math.min(w,h)*.2,w/2,h/2,Math.max(w,h)*.7);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,10,30,.6)');X.fillStyle=g;X.fillRect(0,0,w,h);
  const cx=w/2,bw=Math.min(240*U,w-40),bh=Math.min(46*U,h/11),gap=Math.min(12*U,h/40);
@@ -680,28 +687,42 @@ function drawScreens(now){UI=[];const w=W.clientWidth,h=W.clientHeight;
   title(cx,y0-sz*1.55,'NEON TD',['#00f0ff','#ff3cc8'][Math.floor(now/1600)%2&&Math.random()<.02?1:0],sz);X.fillStyle='#ff3cc8';glow('#ff3cc8',10*U);X.font='700 '+Math.round(Math.min(14*U,w/26))+'px system-ui';X.fillText('T O W E R   D E F E N S E',cx,y0-sz*.75);X.shadowBlur=0;
   if(ASK_NEW){X.fillStyle='#e8f8ff';X.font='600 '+Math.round(15*U)+'px system-ui';X.fillText('Start over? Your saved run will be erased.',cx,y0+bh*.3);
    const hw=(bw-gap)/2,y=y0+bh+gap;btn(cx-bw/2,y,hw,bh,'Erase & start','#ff5a7a',false,false);UI.push({r:[cx-bw/2,y,hw,bh],act:newGame});btn(cx-bw/2+hw+gap,y,hw,bh,'Cancel','#7df',false,false);UI.push({r:[cx-bw/2+hw+gap,y,hw,bh],act:()=>ASK_NEW=false});return}
-  B('▶ Continue','#7dff4a',()=>{if(LIVE){SCREEN=null;return}const d=loadSave();if(d){restore(d);LIVE=true;SCREEN=null}},!sv&&!LIVE,y0);
+  B('▶ Continue','#7dff4a',()=>{if(LIVE){SCREEN=G.paused&&!G.over?'pause':null;return}const d=loadSave();if(d){restore(d);LIVE=true;SCREEN=null}},!sv&&!LIVE,y0);
   if(sv){X.fillStyle='#9fe';X.font='600 '+Math.round(11*U)+'px system-ui';X.textAlign='center';X.fillText('Wave '+sv.wave+' · ◉'+sv.coins+' · ♥'+sv.lives+' · '+(sv.towers.length+sv.bars.length)+' builds',cx,y0+bh+gap*.55)}
   B('✦ New Game','#00f0ff',()=>{if(loadSave()||(LIVE&&G.wave>0))ASK_NEW=true;else newGame()},false,y0+bh+gap*1.6);
   B('⚙ Options','#ff3cc8',()=>{OPT_FROM='title';SCREEN='options'},false,y0+2*bh+gap*2.6);
   X.fillStyle='#556';X.font='600 '+Math.round(10*U)+'px system-ui';X.fillText('Best wave '+bestWave()+'  ·  v'+APP_VERSION,cx,h-14*U);return}
+ if(SCREEN=='pause'){const ph=bh*4+gap*3,y0=h/2-ph/2+20*U;pill(cx-bw/2-16*U,y0-70*U,bw+32*U,ph+90*U,.75,'rgba(0,240,255,.6)');title(cx,y0-36*U,'PAUSED','#00f0ff',Math.min(32*U,w/10));
+  B('▶ Resume','#7dff4a',()=>{G.paused=false;SCREEN=null},false,y0);B('⚙ Options','#00f0ff',()=>{OPT_FROM='pause';SCREEN='options'},false,y0+bh+gap);
+  B('⌂ Home Screen','#ff3cc8',()=>{saveRun();G.hold=false;SCREEN='title'},false,y0+2*(bh+gap));B('✎ Build (stay paused)','#ffd84a',()=>{SCREEN=null},false,y0+3*(bh+gap));return}
  // options
- const rows=[['Master volume','master'],['Music volume','music'],['SFX volume','sfx'],['Screen shake / glitch','shake'],['Show FPS','fps']];
- const rw=Math.min(340*U,w-24),rh=Math.min(42*U,(h-60*U)/(rows.length+3)),top=h/2-(rh*(rows.length+2.4))/2;title(cx,top,'OPTIONS','#00f0ff',Math.min(30*U,rh*.9));
- rows.forEach(([lab,k],i)=>{const y=top+rh*(i+.9),x=cx-rw/2;pill(x,y,rw,rh*.84,.7);X.fillStyle='#e8f8ff';X.font='700 '+Math.round(Math.min(14*U,rh*.34))+'px system-ui';X.textAlign='left';X.textBaseline='middle';X.fillText(lab,x+12*U,y+rh*.42);
-  const sb=rh*.64,by=y+rh*.1;if(typeof OPTS[k]=='boolean'){const r=[x+rw-sb*2.2-8*U,by,sb*2.2,sb];btn(...r,OPTS[k]?'ON':'OFF',OPTS[k]?'#7dff4a':'#ff5a7a',OPTS[k],false);UI.push({r,act:()=>{OPTS[k]=!OPTS[k];saveOpts()}})}
-  else{const r2=[x+rw-sb-8*U,by,sb,sb],r1=[r2[0]-sb*2.4,by,sb,sb];btn(...r1,'◀','#00f0ff',false,OPTS[k]<=0);btn(...r2,'▶','#00f0ff',false,OPTS[k]>=100);X.fillStyle='#ffd84a';X.textAlign='center';X.fillText(OPTS[k]+'%',r1[0]+sb*1.7,by+sb/2);
-   UI.push({r:r1,act:()=>{OPTS[k]=Math.max(0,OPTS[k]-10);saveOpts()}},{r:r2,act:()=>{OPTS[k]=Math.min(100,OPTS[k]+10);saveOpts()}})}});
- const yb=top+rh*(rows.length+1.1),hw=(Math.min(240*U,rw)-gap)/2;btn(cx-hw-gap/2,yb,hw,rh*.9,'Defaults','#ffd84a',false,false);UI.push({r:[cx-hw-gap/2,yb,hw,rh*.9],act:()=>{Object.assign(OPTS,OPT_DEF);saveOpts()}});
- btn(cx+gap/2,yb,hw,rh*.9,'◀ Back','#7dff4a',false,false);UI.push({r:[cx+gap/2,yb,hw,rh*.9],act:()=>{SCREEN=OPT_FROM=='title'?'title':null}})}
+ const two=w>h*1.15,colA=[['h','AUDIO & DISPLAY'],...['master','music','sfx'].map(k=>['s',k]),...Object.keys(TG).map(k=>['t',k])],colB=[['h','VISUAL'],...Object.keys(SL).filter(k=>SL[k][4]=='v').map(k=>['s',k])];
+ const cols=two?[colA,colB]:[[...colA,...colB]],nr=Math.max(...cols.map(c=>c.length)),rw=two?Math.min(330*U,(w-36)/2):Math.min(340*U,w-24);SLR=[];
+ const rh=Math.min(40*U,(h-20*U)/(nr+3.2)),top=h/2-(rh*(nr+2.6))/2+rh*.5;title(cx,top,'OPTIONS','#00f0ff',Math.min(30*U,rh*.85));
+ cols.forEach((rows,ci)=>{const x=two?cx+(ci?6:-6-rw):cx-rw/2;
+  rows.forEach(([ty,k],i)=>{const y=top+rh*(i+.8),fs=Math.round(Math.min(13*U,rh*.34));X.textBaseline='middle';
+  if(ty=='h'){X.fillStyle='#ff3cc8';glow('#ff3cc8',8*U);X.font='800 '+fs+'px system-ui';X.textAlign='left';X.fillText(k,x+6*U,y+rh*.45);X.shadowBlur=0;return}
+  pill(x,y,rw,rh*.86,.7);X.fillStyle='#e8f8ff';X.font='700 '+fs+'px system-ui';X.textAlign='left';X.fillText(ty=='t'?TG[k][0]:SL[k][0],x+12*U,y+rh*.43);
+  const sb=rh*.62,by=y+rh*.12;if(ty=='t'){const r=[x+rw-sb*2.2-8*U,by,sb*2.2,sb];btn(...r,OPTS[k]?'ON':'OFF',OPTS[k]?'#7dff4a':'#ff5a7a',OPTS[k],false);UI.push({r,act:()=>{OPTS[k]=!OPTS[k];saveOpts()}});return}
+  const[,mn,mx,df]=SL[k],vw=34*U,x1=x+rw-vw-10*U,x0=Math.max(x+rw*.5,x1-150*U),ty2=y+rh*.43,f=(OPTS[k]-mn)/(mx-mn),fd=(df-mn)/(mx-mn),on=DRAG==k;
+  X.strokeStyle='rgba(120,170,230,.3)';X.lineWidth=4*U;X.lineCap='round';X.beginPath();X.moveTo(x0,ty2);X.lineTo(x1,ty2);X.stroke();glow('#00f0ff',on?14:8);X.strokeStyle='#00f0ff';X.beginPath();X.moveTo(x0,ty2);X.lineTo(x0+(x1-x0)*f,ty2);X.stroke();X.shadowBlur=0;
+  X.fillStyle='rgba(255,216,74,.6)';X.fillRect(x0+(x1-x0)*fd-1,ty2-6*U,2,12*U);glow('#ff3cc8',on?16:8);X.fillStyle=on?'#fff':'#ff3cc8';X.beginPath();X.arc(x0+(x1-x0)*f,ty2,(on?8:7)*U,0,7);X.fill();X.shadowBlur=0;X.lineCap='butt';
+  X.fillStyle='#ffd84a';X.textAlign='right';X.font='700 '+Math.round(fs*.95)+'px system-ui';X.fillText(OPTS[k]+'%',x+rw-8*U,ty2);SLR.push({k,x0,x1,r:[x0-12*U,y,x1-x0+24*U,rh*.86]})})});
+ const yb=top+rh*(nr+1),hw=(Math.min(240*U,rw)-gap)/2;btn(cx-hw-gap/2,yb,hw,rh*.9,'Defaults','#ffd84a',false,false);UI.push({r:[cx-hw-gap/2,yb,hw,rh*.9],act:()=>{Object.assign(OPTS,OPT_DEF);saveOpts()}});
+ btn(cx+gap/2,yb,hw,rh*.9,'◀ Back','#7dff4a',false,false);UI.push({r:[cx+gap/2,yb,hw,rh*.9],act:optBack})}
+const optBack=()=>{SCREEN=OPT_FROM=='title'?'title':'pause'};let SLR=[],DRAG=null;
+function slideTo(px_){const s=SLR.find(s=>s.k==DRAG);if(!s)return;const[,mn,mx]=SL[DRAG],v=Math.round(mn+(mx-mn)*cl(0,1,(px_-s.x0)/(s.x1-s.x0)));const st=mx-mn>100?5:5;OPTS[DRAG]=Math.round(v/st)*st;applyOpts()}
+C.addEventListener('pointerdown',e=>{if(SCREEN!='options')return;const p=rel(e),s=SLR.find(s=>inR(p,s.r));if(s){DRAG=s.k;slideTo(p[0]);try{C.setPointerCapture(e.pointerId)}catch(_){}}});
+C.addEventListener('pointermove',e=>{if(DRAG)slideTo(rel(e)[0])});['pointerup','pointercancel'].forEach(ev=>addEventListener(ev,()=>{if(DRAG){DRAG=null;saveOpts()}}));
 function newGame(){clearSave();LIVE=true;ASK_NEW=false;reset(window.TD_MAP||newSeed());layout();SCREEN=null}
 const _draw=draw;draw=function(now){_draw(now);drawScreens(now)};
 const _tap2=tap;tap=function(x,y){const p=[x,y];AUD.unlock();
  if(SCREEN){for(const u of UI)if(inR(p,u.r)){sfx('tap');u.act();return}return}
- if(inR(p,R.opt)){sfx('tap');OPT_FROM='pause';SCREEN='options';return}
- if(inR(p,R.ttl)){sfx('tap');saveRun();G.paused=true;G.hold=false;SCREEN='title';return}
- const wasP=G.paused;_tap2(x,y);if(!G.over&&!G.won){saveRun()}if(G.over)clearSave()};
-addEventListener('keydown',e=>{if(e.key=='Escape'){if(SCREEN=='options'){SCREEN=OPT_FROM=='title'?'title':null}else if(!SCREEN&&G.active&&!G.paused){G.paused=true;G.hold=false;saveRun()}}});
+
+
+ const wasP=G.paused;_tap2(x,y);if(G.paused&&!wasP&&!G.over&&!G.won){G.hold=false;SCREEN='pause'}if(!G.over&&!G.won){saveRun()}if(G.over)clearSave()};
+function togglePause(){if(SCREEN=='pause'){G.paused=false;SCREEN=null}else if(SCREEN=='options')optBack();else if(!SCREEN&&!G.over&&!G.won){G.paused=true;G.hold=false;SCREEN='pause';saveRun()}}
+addEventListener('keydown',e=>{if(e.key=='Escape'||e.key=='p'||e.key=='P'){if(SCREEN=='title')return;if(e.key!='Escape'&&SCREEN=='options')return;togglePause()}});
 addEventListener('pagehide',saveRun);addEventListener('beforeunload',saveRun);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRun()});
 // title screen must not leak the ⏩ hold
 </script></body></html>
