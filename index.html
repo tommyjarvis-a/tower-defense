@@ -247,7 +247,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261016000618';
+const APP_VERSION='20261016003141';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
@@ -677,7 +677,7 @@ const _adv=advance;advance=function(dt){if(SCREEN)return;const was=G.active,ov=G
 function title(cx,y,t,col,sz){X.textAlign='center';X.textBaseline='middle';X.fillStyle=col;glow(col,18*U);X.font='800 '+Math.round(sz)+'px system-ui';X.fillText(t,cx,y);X.shadowBlur=0}
 function drawScreens(now){UI=[];const w=W.clientWidth,h=W.clientHeight;
  if(OPTS.fps){FPS.n++;if(now-FPS.t>500){FPS.v=Math.round(FPS.n*1000/(now-FPS.t));FPS.n=0;FPS.t=now}X.fillStyle='#7dff4a';X.font='700 '+Math.round(11*U)+'px system-ui';X.textAlign='left';X.textBaseline='top';X.fillText(FPS.v+' FPS',6,6)}
- R.opt=R.ttl=null;
+ if(!SCREEN&&R.menuB&&!G.over&&!G.won)circ(R.menuB[0]+R.menuB[2]/2,R.menuB[1]+R.menuB[3]/2,R.menuB[2]/2,'☰','#ff3cc8',false,false,'MENU');
 
  if(!SCREEN)return;
  X.fillStyle='rgba(4,6,16,.82)';X.fillRect(0,0,w,h);const g=X.createRadialGradient(w/2,h/2,Math.min(w,h)*.2,w/2,h/2,Math.max(w,h)*.7);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,10,30,.6)');X.fillStyle=g;X.fillRect(0,0,w,h);
@@ -687,14 +687,14 @@ function drawScreens(now){UI=[];const w=W.clientWidth,h=W.clientHeight;
   title(cx,y0-sz*1.55,'NEON TD',['#00f0ff','#ff3cc8'][Math.floor(now/1600)%2&&Math.random()<.02?1:0],sz);X.fillStyle='#ff3cc8';glow('#ff3cc8',10*U);X.font='700 '+Math.round(Math.min(14*U,w/26))+'px system-ui';X.fillText('T O W E R   D E F E N S E',cx,y0-sz*.75);X.shadowBlur=0;
   if(ASK_NEW){X.fillStyle='#e8f8ff';X.font='600 '+Math.round(15*U)+'px system-ui';X.fillText('Start over? Your saved run will be erased.',cx,y0+bh*.3);
    const hw=(bw-gap)/2,y=y0+bh+gap;btn(cx-bw/2,y,hw,bh,'Erase & start','#ff5a7a',false,false);UI.push({r:[cx-bw/2,y,hw,bh],act:newGame});btn(cx-bw/2+hw+gap,y,hw,bh,'Cancel','#7df',false,false);UI.push({r:[cx-bw/2+hw+gap,y,hw,bh],act:()=>ASK_NEW=false});return}
-  B('▶ Continue','#7dff4a',()=>{if(LIVE){SCREEN=G.paused&&!G.over?'pause':null;return}const d=loadSave();if(d){restore(d);LIVE=true;SCREEN=null}},!sv&&!LIVE,y0);
+  B('▶ Continue','#7dff4a',()=>{if(LIVE){SCREEN=null;return}const d=loadSave();if(d){restore(d);LIVE=true;SCREEN=null}},!sv&&!LIVE,y0);
   if(sv){X.fillStyle='#9fe';X.font='600 '+Math.round(11*U)+'px system-ui';X.textAlign='center';X.fillText('Wave '+sv.wave+' · ◉'+sv.coins+' · ♥'+sv.lives+' · '+(sv.towers.length+sv.bars.length)+' builds',cx,y0+bh+gap*.55)}
   B('✦ New Game','#00f0ff',()=>{if(loadSave()||(LIVE&&G.wave>0))ASK_NEW=true;else newGame()},false,y0+bh+gap*1.6);
   B('⚙ Options','#ff3cc8',()=>{OPT_FROM='title';SCREEN='options'},false,y0+2*bh+gap*2.6);
   X.fillStyle='#556';X.font='600 '+Math.round(10*U)+'px system-ui';X.fillText('Best wave '+bestWave()+'  ·  v'+APP_VERSION,cx,h-14*U);return}
- if(SCREEN=='pause'){const ph=bh*4+gap*3,y0=h/2-ph/2+20*U;pill(cx-bw/2-16*U,y0-70*U,bw+32*U,ph+90*U,.75,'rgba(0,240,255,.6)');title(cx,y0-36*U,'PAUSED','#00f0ff',Math.min(32*U,w/10));
-  B('▶ Resume','#7dff4a',()=>{G.paused=false;SCREEN=null},false,y0);B('⚙ Options','#00f0ff',()=>{OPT_FROM='pause';SCREEN='options'},false,y0+bh+gap);
-  B('⌂ Home Screen','#ff3cc8',()=>{saveRun();G.hold=false;SCREEN='title'},false,y0+2*(bh+gap));B('✎ Build (stay paused)','#ffd84a',()=>{SCREEN=null},false,y0+3*(bh+gap));return}
+ if(SCREEN=='pause'){const ph=bh*3+gap*2,y0=h/2-ph/2+20*U;pill(cx-bw/2-16*U,y0-70*U,bw+32*U,ph+90*U,.75,'rgba(0,240,255,.6)');title(cx,y0-36*U,'PAUSED','#00f0ff',Math.min(32*U,w/10));
+  B('▶ Resume','#7dff4a',closeMenu,false,y0);B('⚙ Options','#00f0ff',()=>{OPT_FROM='pause';SCREEN='options'},false,y0+bh+gap);
+  B('⌂ Home Screen','#ff3cc8',()=>{saveRun();G.hold=false;SCREEN='title'},false,y0+2*(bh+gap));return}
  // options
  const two=w>h*1.15,colA=[['h','AUDIO & DISPLAY'],...['master','music','sfx'].map(k=>['s',k]),...Object.keys(TG).map(k=>['t',k])],colB=[['h','VISUAL'],...Object.keys(SL).filter(k=>SL[k][4]=='v').map(k=>['s',k])];
  const cols=two?[colA,colB]:[[...colA,...colB]],nr=Math.max(...cols.map(c=>c.length)),rw=two?Math.min(330*U,(w-36)/2):Math.min(340*U,w-24);SLR=[];
@@ -720,9 +720,18 @@ const _tap2=tap;tap=function(x,y){const p=[x,y];AUD.unlock();
  if(SCREEN){for(const u of UI)if(inR(p,u.r)){sfx('tap');u.act();return}return}
 
 
- const wasP=G.paused;_tap2(x,y);if(G.paused&&!wasP&&!G.over&&!G.won){G.hold=false;SCREEN='pause'}if(!G.over&&!G.won){saveRun()}if(G.over)clearSave()};
-function togglePause(){if(SCREEN=='pause'){G.paused=false;SCREEN=null}else if(SCREEN=='options')optBack();else if(!SCREEN&&!G.over&&!G.won){G.paused=true;G.hold=false;SCREEN='pause';saveRun()}}
-addEventListener('keydown',e=>{if(e.key=='Escape'||e.key=='p'||e.key=='P'){if(SCREEN=='title')return;if(e.key!='Escape'&&SCREEN=='options')return;togglePause()}});
+ if(inR(p,R.menuB)&&!G.over&&!G.won){sfx('tap');openMenu();return}
+ _tap2(x,y);if(!G.over&&!G.won){saveRun()}if(G.over)clearSave()};
+let MENU_PREV=false;
+function openMenu(){MENU_PREV=G.paused;G.paused=true;G.hold=false;SCREEN='pause';saveRun()}
+function closeMenu(){G.paused=MENU_PREV;SCREEN=null}
+function togglePlay(){if(SCREEN||G.over||G.won)return;if(G.paused)G.paused=false;else if(G.active){G.paused=true;G.hold=false;saveRun()}}
+addEventListener('keydown',e=>{if(SCREEN=='title')return;const k=e.key;
+ if(k==' '||k=='p'||k=='P'){e.preventDefault();togglePlay()}
+ else if(k=='Escape'){if(SCREEN=='pause')closeMenu();else if(SCREEN=='options')optBack();else if(!G.over&&!G.won)openMenu()}});
+const _layM=layout;layout=function(){_layM();const w=W.clientWidth,h=W.clientHeight,br=31*U,mr=br*.75;R.menuB=LAND?sq(w-br-12*U,h-5*br-36*U,mr):sq(w-br-12*U,h-3*br-24*U,mr);
+ if(!LAND&&R.menuB[1]<oy+cell*ROWS+6*U){const m=sq(R.fast[0]-mr-10*U,R.fast[1]+mr,mr),d=R.pill[0]+R.pill[2]+8*U-m[0];R.menuB=m;// no room above play: sit left of ⏩ and slide the build pill left
+  if(d>0){const dx=Math.min(d,R.pill[0]-4*U);R.pill[0]-=dx;for(const k of KINDS)R[k][0]-=dx}}};layout();
 addEventListener('pagehide',saveRun);addEventListener('beforeunload',saveRun);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRun()});
 // title screen must not leak the ⏩ hold
 </script></body></html>
