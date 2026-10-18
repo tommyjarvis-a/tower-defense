@@ -13,6 +13,7 @@ s,n=re.subn(r"const APP_VERSION='[^']*';","const APP_VERSION='%s';"%v,s); assert
 open(src+'/index.html','w').write(s); open(src+'/version.json','w').write('{"v":"%s"}\n'%v)
 PY
 cp "$SRC/index.html" "$SRC/icon.png" "$SRC/version.json" "$SRC/deploy.sh" "$REPO/"
+rm -rf "$REPO/sprites"; mkdir -p "$REPO/sprites"; cp "$SRC"/sprites/*.png "$SRC/sprites/sprites.json" "$REPO/sprites/"   # art-v2 sheets (lazy-loaded)
 cd "$REPO"; git add -A
 git -c user.name=tommyjarvis-a -c user.email=tommyjarvis@mail.grokbot.com commit -qm "${1:-Deploy} (v$V)"
 T="${GITHUB_TOKEN_TOMMYJARVIS:?missing token}"
