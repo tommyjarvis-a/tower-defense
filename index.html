@@ -187,7 +187,7 @@ function draw(now){const w=W.clientWidth,h=W.clientHeight;if(C.width!=Math.round
  if(G.over)ov('GAME OVER','#ff5a7a',['Reached wave '+G.wave,'Kills: '+(G.kills||0),'Best wave: '+bestWave()+(G.newBest?'  ★ NEW BEST':''),'Map seed '+MAP.seed],[['Restart','#ff5a7a',()=>reset()]]);
 
  else{if(!G.active&&isBoss(G.wave+1)&&!G.msg){X.fillStyle='#ff3c6e';X.font='800 '+Math.round(15*U)+'px system-ui';X.textAlign='center';glow('#ff3c6e',12);X.globalAlpha=.6+.4*Math.sin(now/200);X.fillText('⚠ BOSS WAVE NEXT ⚠',(AV.l+AV.r)/2,AV.t+14*U);X.globalAlpha=1;X.shadowBlur=0}
-  if(G.msg){const boss=G.msg.includes('BOSS');X.fillStyle='rgba(0,0,0,.6)';X.fillRect(0,h/2-40*U,w,80*U);X.fillStyle=boss?'#ff3c6e':'#7dff4a';X.font='800 '+Math.round(Math.min(24*U,w/18))+'px system-ui';X.textAlign='center';X.textBaseline='middle';glow(X.fillStyle,14);X.fillText(G.msg,w/2,h/2);X.shadowBlur=0}}}
+  if(G.msg){const boss=G.msg.includes('BOSS');const ml=AV.l+4*U,mr=AV.r-4*U,mw=Math.max(40,mr-ml),mh=Math.min(64*U,(AV.b-AV.t)*.3),my=(AV.t+AV.b)/2,mx=(ml+mr)/2;X.save();X.fillStyle='rgba(0,0,0,.6)';X.beginPath();X.roundRect?X.roundRect(ml,my-mh/2,mw,mh,10*U):X.rect(ml,my-mh/2,mw,mh);X.fill();X.fillStyle=boss?'#ff3c6e':'#7dff4a';X.font='800 '+Math.round(Math.min(24*U,mw/16,mh*.42))+'px system-ui';X.textAlign='center';X.textBaseline='middle';glow(X.fillStyle,14);X.fillText(G.msg,mx,my,mw-16*U);X.restore()}}}
 // ---- logic ----
 // ---- logic ----
 function waveInfo(n){return{count:Math.min(CFG.MAX_MOBS_PER_WAVE,6+n*2+Math.floor(n*n/6)),speed:Math.min(3.2,1.3+n*.08),gap:Math.max(CFG.MIN_SPAWN_GAP,.9-n*.03,n>12?.3:0)}}
@@ -264,7 +264,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261018173856';
+const APP_VERSION='20261018174312';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
