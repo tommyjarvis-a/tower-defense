@@ -173,7 +173,7 @@ function draw(now){const w=W.clientWidth,h=W.clientHeight;if(C.width!=Math.round
  for(const b of G.bars){if(b==sel){X.strokeStyle='#ffa020';X.lineWidth=2;X.strokeRect(...WT(b.x,b.y).map(v=>v+1),cell-2,cell-2)}drawSprite('bar',...WP(b.x+.5,b.y+.5),cell,{hp:b.hp/(b.max||BAR_HP),id:b.x*31+b.y,lvl:lvlOf(b),state:'idle'})}
  for(const t of G.towers){if(t==sel){X.fillStyle='rgba(0,240,255,.08)';X.strokeStyle=T[t.k].col;X.lineWidth=1.5;X.beginPath();X.arc(...WP(t.x+.5,t.y+.5),rangeOf(t)*cell,0,7);X.fill();X.stroke();if(T[t.k].minRange){X.setLineDash([5,5]);X.strokeStyle='#ff5a5a';X.fillStyle='rgba(255,60,60,.12)';X.beginPath();X.arc(...WP(t.x+.5,t.y+.5),T[t.k].minRange*cell,0,7);X.fill();X.stroke();X.setLineDash([])}}
   drawSprite(t.k,...WP(t.x+.5,t.y+.5),cell,{ang:t.ang,flash:now-t.fl<50,id:t.x*31+t.y,lvl:lvlOf(t),state:now-t.fl<50?'fire':'idle'})}
- for(const m of G.mobs)drawSprite(m.boss?'boss':'mob',...WP(m.p[0],m.p[1]),cell,mobState(m,now));
+ for(const m of G.mobs)drawSprite(mobType(m),...WP(m.p[0],m.p[1]),cell*(m.sz||1),mobState(m,now));
  for(const s of G.shots)drawShot(s.k,...WP(s.x1,s.y1),...WP(s.x2,s.y2),s.life/s.max);
  for(const f of G.fx){X.globalAlpha=Math.max(0,f.life/f.max);glow(f.c,10);X.strokeStyle=f.c;X.lineWidth=2;X.beginPath();X.arc(...WP(f.x,f.y),cell*(.5-.3*f.life/f.max),0,7);X.stroke();X.globalAlpha=1;X.shadowBlur=0;if(f.t){X.fillStyle='#ffd84a';X.font='bold 12px system-ui';X.textAlign='center';{const q=WP(f.x,f.y);X.fillText(f.t,q[0],q[1]-cell*(.6-.3*f.life/f.max))}}}
  drawExtra(now);gooTint();
@@ -217,7 +217,7 @@ function update(dt){if(G.over||G.won)return;G.time=(G.time||0)+dt;if(G.msgT>0){G
  if(destroyed){G.bars=G.bars.filter(b=>b.hp>0);recompute()}
  if(G.lives<=0){G.lives=0;G.over=true;G.newBest=saveBest(G.wave);G.active=false;G.msg='';tryAutoReload()}
  G.mobs=G.mobs.filter(m=>!m.dead);
- for(const t of G.towers){const S=T[t.k];t.cd-=dt;let best=null,bd=1e9;for(const m of G.mobs){const dx=m.p[0]-t.x-.5,dy=m.p[1]-t.y-.5,r=remaining(m);if(dx*dx+dy*dy<=S.range*S.range&&r<bd&&m.hp>0){bd=r;best=m}}
+ for(const t of G.towers){const S=T[t.k];t.cd-=dt;let best=null,bd=1e9;for(const m of G.mobs){const dx=m.p[0]-t.x-.5,dy=m.p[1]-t.y-.5,r=remaining(m);if(dx*dx+dy*dy<=S.range*S.range&&r<bd&&m.hp>0&&!(m.gh>0||m.hid>0)){bd=r;best=m}}
   if(best){t.ang=Math.atan2(best.p[1]-t.y-.5,best.p[0]-t.x-.5);if(t.cd<=0){t.cd=1/S.rate;t.fl=performance.now();best.hp-=S.dmg*powMul(lvlOf(t));G.shots.push({k:t.k,x1:t.x+.5,y1:t.y+.5,x2:best.p[0]+(Math.random()-.5)*.15,y2:best.p[1]+(Math.random()-.5)*.15,life:t.k=='mg'?.06:.18,max:t.k=='mg'?.06:.18});
    if(best.hp<=0){G.coins+=best.reward;G.kills=(G.kills||0)+1;if(best.boss)G.bossKilled=1;G.fx.push({x:best.p[0],y:best.p[1],c:best.boss?'#c060ff':'#7dff4a',life:best.boss?1.2:.5,max:best.boss?1.2:.5,t:'+'+best.reward})}}}}
  G.mobs=G.mobs.filter(m=>m.hp>0);
@@ -264,7 +264,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261018033652';
+const APP_VERSION='20261018172129';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
@@ -558,7 +558,7 @@ function upgrade(t){if(!t||G.over||G.won)return false;const l=lvlOf(t),c=upCost(
 SFX.levelup=[.5,.1,()=>{[0,.07,.14,.21].forEach((d,i)=>tone('square',mf(72+[0,4,7,12][i]),0,.14,.06,d,0,3200));tone('sine',mf(84),0,.35,.08,.28)}];
 // crisp pass after post-processing: mobs + HP bars punch through smoke, level pips, tower popup
 function overlayWorld(){const now=performance.now();
- if(FX.mode=='post'&&FX.q!='off')for(const m of G.mobs)drawSprite(m.boss?'boss':'mob',...WP(m.p[0],m.p[1]),cell,mobState(m,now));
+ if(FX.mode=='post'&&FX.q!='off')for(const m of G.mobs)drawSprite(mobType(m),...WP(m.p[0],m.p[1]),cell*(m.sz||1),mobState(m,now));
  if(FX.mode=='post'&&FX.q!='off'){gooTint();if(typeof drawBalls=='function')drawBalls()}
  for(const t of[...G.towers,...G.bars]){const l=lvlOf(t);if(l<2)continue;const n=l-1,r=Math.max(2,cell*.06),gap=r*2.6,c_=WP(t.x+.5,t.y+.5),x0=c_[0]-(n-1)*gap/2,y=c_[1]+cell*.43;
   X.fillStyle='rgba(0,0,0,.7)';X.beginPath();X.roundRect(x0-r*1.8,y-r*1.8,(n-1)*gap+r*3.6,r*3.6,r*1.8);X.fill();X.fillStyle=l>=CFG.MAX_TOWER_LEVEL?'#ff3cc8':'#ffd84a';for(let i=0;i<n;i++){X.beginPath();X.arc(x0+i*gap,y,r,0,7);X.fill()}}
@@ -614,7 +614,7 @@ const _upd=update;update=function(dt){const all=G.towers,sp=all.filter(t=>t.k=='
  for(const t of sp){t.cd=(t.cd||0)-dt;const cx=t.x+.5,cy=t.y+.5,l=lvlOf(t);
   if(t.k=='gl'){const r=glueRad(l),inr=G.mobs.filter(m=>m.hp>0&&Math.hypot(m.p[0]-cx,m.p[1]-cy)<=r);if(t.cd<=0&&inr.length){t.cd=GL.period;t.fl=performance.now();G.rings.push({x:cx,y:cy,r,life:.7,max:.7});sfx('glue');
     const s=glueSlow(l);for(const m of inr){const e=s*(m.boss?GL.bossMul:1);if(!(m.slowT>0)||e>=m.slow)m.slow=e;m.slowT=GL.dur;if(GL.dmg){m.hp-=GL.dmg;if(m.hp<=0)killMob(m)}}}}
-  else{let best=null,bd=1e9;for(const m of G.mobs){const d=Math.hypot(m.p[0]-cx,m.p[1]-cy),r=remaining(m);if(m.hp>0&&d<=RK.range&&d>=RK.minRange&&r<bd){bd=r;best=m}}
+  else{let best=null,bd=1e9;for(const m of G.mobs){const d=Math.hypot(m.p[0]-cx,m.p[1]-cy),r=remaining(m);if(m.hp>0&&!(m.gh>0||m.hid>0)&&d<=RK.range&&d>=RK.minRange&&r<bd){bd=r;best=m}}
    if(best){let aim=best.p;for(let i=0;i<3;i++){const tt=Math.hypot(aim[0]-cx,aim[1]-cy)/RK.speed;aim=predict(best,tt)}t.ang=Math.atan2(aim[1]-cy,aim[0]-cx);
     if(t.cd<=0){t.cd=RK.period;t.fl=performance.now();const d=Math.hypot(aim[0]-cx,aim[1]-cy)||1e-3;G.rockets.push({x:cx,y:cy,sx:cx,sy:cy,tx:aim[0],ty:aim[1],d,tr:0,tgt:best,dmg:RK.dmg*powMul(l),trail:[]});sfx('launch')}}}}
  for(const k of G.rockets){const step=RK.speed*dt;k.tr+=step;const f=Math.min(1,k.tr/k.d);k.x=k.sx+(k.tx-k.sx)*f;k.y=k.sy+(k.ty-k.sy)*f;k.trail.push([k.x,k.y,.6]);
@@ -655,7 +655,7 @@ layout();
 T.cn={name:'Cannon',cost:CFG.CANNON.cost,dmg:CFG.CANNON.dmg,col:'#ff4fd8',range:CFG.CANNON.range};KINDS.push('cn');LBL.cn='Cannon';
 const _upd3=update;update=function(dt){const all=G.towers,cn=all.filter(t=>t.k=='cn');G.towers=all.filter(t=>t.k!='cn');try{_upd3(dt)}finally{G.towers=all.filter(t=>G.towers.includes(t)||cn.includes(t))}
  if(G.over||G.won||!dt)return;const CN=CFG.CANNON;G.balls=G.balls||[];
- for(const t of cn){t.cd=(t.cd||0)-dt;const cx=t.x+.5,cy=t.y+.5;let best=null,bd=1e9;for(const m of G.mobs){const d=Math.hypot(m.p[0]-cx,m.p[1]-cy),r=remaining(m);if(m.hp>0&&d<=CN.range&&r<bd){bd=r;best=m}}
+ for(const t of cn){t.cd=(t.cd||0)-dt;const cx=t.x+.5,cy=t.y+.5;let best=null,bd=1e9;for(const m of G.mobs){const d=Math.hypot(m.p[0]-cx,m.p[1]-cy),r=remaining(m);if(m.hp>0&&!(m.gh>0||m.hid>0)&&d<=CN.range&&r<bd){bd=r;best=m}}
   if(!best)continue;let aim=best.p;for(let i=0;i<3;i++){const tt=Math.hypot(aim[0]-cx,aim[1]-cy)/CN.speed;aim=predict(best,tt)}const a=Math.atan2(aim[1]-cy,aim[0]-cx);t.ang=a;
   if(t.cd<=0){t.cd=CN.period;t.fl=performance.now();G.shotsFired=(G.shotsFired||0)+1;G.balls.push({x:cx,y:cy,dx:Math.cos(a),dy:Math.sin(a),tr:0,dmg:CN.dmg*powMul(lvlOf(t)),hit:new Set(),trail:[],id:G.shotsFired});sfx('cannon')}}
  for(const b of G.balls){const step=CN.speed*dt,n=Math.max(1,Math.ceil(step/.1));for(let s=0;s<n&&!b.done;s++){const d=Math.min(step/n,CN.range-b.tr);b.x+=b.dx*d;b.y+=b.dy*d;b.tr+=d;
@@ -693,17 +693,17 @@ function defSprite(type,draw){SPRITES[type]={draw,sheet:null}}
 defSprite('bar',(ctx,x,y,s,clk,st)=>drawBarricade(x,y,s,st.hp));
 defSprite('mob',(ctx,x,y,s,clk,st)=>drawMob(x,y,s,st.hp,st.ph));
 defSprite('boss',(ctx,x,y,s,clk,st)=>drawBoss(x,y,s,st.hp,st.ph));
-const mobState=(m,now)=>{const st={hp:m.hp/m.max,ph:now/120+m.id,id:m.id,ang:m.v?Math.atan2(m.v[1],m.v[0]):0,state:m.atk?'attack':m.slowT>0?'slowed':'walk'};
+let mobState=(m,now)=>{const st={hp:m.hp/m.max,ph:now/120+m.id,id:m.id,ang:m.v?Math.atan2(m.v[1],m.v[0]):0,state:m.atk?'attack':m.slowT>0?'slowed':'walk'};
  if(m.boss){if(m._hl==null)m._hl=m.hp;if(m._hl-m.hp>m.max*.03&&now-(m._ht||-1e9)>900){m._ht=now;m._hl=m.hp}if(now-(m._ht||-1e9)<330){st.state='hit';st.t0=m._ht/1000}} // hit flinch: >=3% chunk, max ~1/s
  return st};
 const sheetReady=sh=>!!(sh&&sh.img&&sh.img.complete&&sh.img.naturalWidth);
 function registerSheet(type,cfg){const sp=SPRITES[type]||(SPRITES[type]={draw:null,sheet:null}); // extra keys (e.g. 'mg_L3','boss_hit') are sheet-only variants
  const img=new Image();
  img.onerror=()=>{console.warn('Neon TD: sprite sheet failed, using procedural art:',cfg.src);if(sp.sheet&&sp.sheet.img===img)sp.sheet=null};img.src=cfg.src;sp.sheet=Object.assign({fw:64,fh:64,frames:1,fps:8,rows:{},scale:1,desync:.37},cfg,{img});return sp.sheet}
-function drawSheet(type,sh,x,y,s,st){const row=sh.rows[st.state]??sh.rows.default??0,fr=sh.oneShot?Math.max(0,Math.min(sh.frames-1,Math.floor((ANIM.t-(st.t0||0))*sh.fps))):Math.floor(ANIM.t*sh.fps+(st.id||0)*sh.desync)%sh.frames,
+function drawSheet(type,sh,x,y,s,st){const row=sh.rows[st.state]??sh.rows.default??0,fr=st.fr!=null?st.fr:sh.oneShot?Math.max(0,Math.min(sh.frames-1,Math.floor((ANIM.t-(st.t0||0))*sh.fps))):Math.floor(ANIM.t*sh.fps+(st.id||0)*sh.desync)%sh.frames,
  dw=s*sh.scale,dh=dw*sh.fh/sh.fw;X.save();X.translate(x,y);if(sh.rotate&&st.ang!=null&&st.state!='icon')X.rotate(st.ang);if(type.length==2&&s===cell)X.globalAlpha*=flick(x,y);
  X.drawImage(sh.img,(sh.ox||0)+fr*sh.fw,(sh.oy||0)+row*sh.fh,sh.fw,sh.fh,-dw/2,-dh/2,dw,dh);X.restore();
- if(st.hp!=null&&sh.hpBar!==false&&st.state!='icon'){const bw=s*(type=='boss'?1.1:.6),bh=Math.max(3,s*.08),by=y-dh/2-bh*1.5;X.fillStyle='#300';X.fillRect(x-bw/2,by,bw,bh);X.fillStyle=st.hp>.5?'#3f6':st.hp>.25?'#fc3':'#f33';X.fillRect(x-bw/2,by,bw*st.hp,bh)}}
+ if(st.hp!=null&&sh.hpBar!==false&&st.state!='icon'){const bw=s*(type=='boss'?1.1:.6),bh=Math.max(3,s*.08),by=sh.barY!=null?y-s*sh.barY-bh:y-dh/2-bh*1.5;X.fillStyle='#300';X.fillRect(x-bw/2,by,bw,bh);X.fillStyle=st.hp>.5?'#3f6':st.hp>.25?'#fc3':'#f33';X.fillRect(x-bw/2,by,bw*st.hp,bh)}}
 function drawSprite(type,x,y,s,st){const sp=SPRITES[type];if(!sp)return;st=st||{};if(st.state!='icon'&&st.ang!=null)st.ang+=ROTA(); // logical -> screen facing (portrait rotation)
  if(type=='bar'&&st.hp!=null&&st.state!='icon')st.state=st.hp<.25?'hp25':st.hp<.5?'hp50':'idle';
  let sh=sp.sheet;
@@ -837,6 +837,105 @@ function togglePlay(){if(SCREEN||G.over||G.won)return;if(G.paused)G.paused=false
 addEventListener('keydown',e=>{if(SCREEN=='title')return;const k=e.key;
  if(k==' '||k=='p'||k=='P'){e.preventDefault();togglePlay()}
  else if(k=='Escape'){if(SCREEN=='pause')closeMenu();else if(SCREEN=='options')optBack();else if(!G.over&&!G.won)openMenu()}});
+// ===================== VIRUS ENEMIES (v3): five standard mob types replace the single mob; boss unchanged =====================
+// k: f Glitchy, g Phage (gm = mini phage), h Pop-Up, i Packet Worm, j Trojan. hp/spd = multipliers on the wave's base mob HP / speed.
+// Sheets (art-v2 final, see SPRITES.md / art-v2/ENEMY-ROLES.md): <id>, <id>_hit, <id>_death with id from VID.
+const VID={f:'glitchy',g:'phage',gm:'phage_mini',h:'popup',i:'worm',j:'trojan'};
+const VT={
+ f:{name:'Glitchy',hp:.5,spd:1.12,reward:14,cost:.95,gap:.65,col:'#ff3a7c',tip:'blinks forward, untargetable mid-blink'},
+ g:{name:'Phage',hp:1,spd:1,reward:17,cost:1.9,gap:1.1,col:'#40ff70',tip:'splits into 2 mini phages'},
+ gm:{name:'Mini Phage',hp:.35,spd:1.1,reward:5,col:'#40ff70'},
+ h:{name:'Pop-Up',hp:2.4,spd:.7,reward:40,cost:3,gap:1.5,col:'#4aa8ff',tip:'shield window blocks all damage'},
+ i:{name:'Packet Worm',hp:.33,spd:1.5,reward:6,cost:.42,col:'#b8ff30',tip:'fast swarm in trains of 5–8'},
+ j:{name:'Trojan',hp:2,spd:.8,reward:45,cost:4,gap:1.8,col:'#ff4040',tip:'armored + glue-immune, releases 3 Glitchys'}};
+const VX={blinkEvery:[3,4],blinkDist:1,blinkFps:12,shieldPeriod:5,shieldDur:1,armor:3.5,armorPerWave:.06,armorMin:.2,trainMin:5,trainMax:8,trainSpace:.42,budget:.64,bossBudget:.75,
+ splitDelay:10/12,gmOfs:[-.24,.24],jOfs:[-.3,0,.3],flinchMs:333,flinchEvery:600};
+// wave intro: 1-2 Glitchy+Phage, 3 Pop-Up, 5 Worm trains, 7 Trojan; then mixed
+function waveWeights(n){const w={f:.45,g:.55};if(n>=3)w.h=n<5?.2:.17;if(n>=5)w.i=.14;if(n>=7)w.j=n<10?.1:.14;if(n>=9){w.f=.24;w.g=.3}return w}
+function buildQueue(n){const base=waveInfo(n),gap=base.gap,q=[],R=Math.random,W=waveWeights(n);let budget=base.count*VX.budget*(isBoss(n)?VX.bossBudget:1);
+ const add=k=>{if(k=='i'){const L=VX.trainMin+Math.floor(R()*(VX.trainMax-VX.trainMin+1)),tg=VX.trainSpace/(base.speed*VT.i.spd);for(let j=0;j<L;j++)q.push({k:'i',gap:j<L-1?tg:gap*1.2});budget-=L*VT.i.cost}else{q.push({k,gap:gap*VT[k].gap});budget-=VT[k].cost}};
+ const force={1:'f',2:'f',3:'h',5:'i',7:'j'}[n];if(force)add(force);
+ const ks=Object.keys(W),tot=ks.reduce((a,k)=>a+W[k],0);
+ while(budget>.3){let r=R()*tot,k=ks[0];for(const kk of ks){r-=W[kk];if(r<=0){k=kk;break}}add(k)}
+ if(force&&force!='i'&&q.length>3){const i=q.findIndex(e=>e.k==force);const[e]=q.splice(i,1);q.splice(Math.min(q.length,2+Math.floor(R()*3)),0,e)}
+ return q}
+const _srV=startRound;startRound=function(){const was=G.active;_srV();if(!was&&G.active){G.queue=buildQueue(G.wave);G.spawnLeft=G.queue.length+(isBoss(G.wave)?1:0)}};
+const vNoHit=m=>m.gh>0||m.si>0||m.shOn||m.hid>0; // glitching / just spawned / shielded / still inside the death animation
+function vSetHP(m,v){if(v>=m._h||v!==v){m._h=v;return}let d=m._h-v;
+ if(vNoHit(m)){m._blk=performance.now();return}
+ if(m.armor)d=Math.max(d*VX.armorMin,d-m.armor);
+ m._h-=d;m._hitAt=performance.now();if(m._h<=0&&!m._dd){m._dd=1;vDeath(m)}}
+function vType(m,k){const t=VT[k],g=Math.pow(1+HP_GROWTH,Math.max(0,G.wave-1)),hp=CFG.MOB_HP*g*t.hp;
+ delete m.hp;Object.defineProperty(m,'hp',{get(){return this._h},set(v){vSetHP(this,v)},enumerable:true,configurable:true});
+ Object.assign(m,{k,_h:hp,max:hp,spd:t.spd,reward:t.reward});
+ if(k=='f'){m.bt=VX.blinkEvery[0]+Math.random()*(VX.blinkEvery[1]-VX.blinkEvery[0]);m.bk=null;m.gh=0}
+ if(k=='h')m.sp=Math.random()*(VX.shieldPeriod-VX.shieldDur);
+ if(k=='j')m.armor=VX.armor+VX.armorPerWave*G.wave;
+ vSeen(k=='gm'?'g':k);return m}
+const _spV=spawn;spawn=function(boss){const m=_spV(boss);if(boss)return m;const e=(G.queue&&G.queue.shift())||{k:'g',gap:G.gap};vType(m,e.k);G.gap=e.gap;return m};
+// children appear when the parent's death animation ends, at the art's landing offsets (screen-x, tiles), then glide onto the path
+function vChild(p,k,ofs,wait){const c=_spV(false);vType(c,k);
+ Object.assign(c,{route:p.route,i:p.i,t:p.t,trav:p.trav,p:[p.p[0],p.p[1]],hid:VX.splitDelay,delay:VX.splitDelay+wait,si:VX.splitDelay+.2,ofs,_fl:p._fl});return c}
+function vDeath(m){if(!m.k)return;ART.vd.push({id:VID[m.k],x:m.p[0],y:m.p[1],t0:ANIM.t,fl:m._fl});
+ if(m.k=='g')VX.gmOfs.forEach((o,i)=>vChild(m,'gm',o,i*.2));
+ else if(m.k=='j')VX.jOfs.forEach((o,i)=>vChild(m,'f',o,i*.22))}
+ART.vd=[];
+const _mvV=moveMob;moveMob=function(m,dt){if(m.delay>0){m.delay-=dt;return}if(m.bk!=null)return;_mvV(m,dt)}; // waiting children / mid-blink: hold position
+const _upV=update;update=function(dt){
+ for(const m of G.mobs){if(!m.k)continue;if(m.si>0)m.si-=dt;if(m.hid>0)m.hid-=dt;if(m.imm>0)m.imm-=dt;if(!(m.delay>0)&&m.ofs)m.ofs*=Math.max(0,1-dt/.3)<.02?0:Math.max(0,1-dt/.3);
+  if(m.k=='f'){if(m.bk==null){m.bt-=dt;if(m.bt<=0&&!m.atk&&!(m.delay>0)){m.bk=0;m.bj=0}}
+   if(m.bk!=null){m.bk+=dt;const f=m.bk*VX.blinkFps;m.gh=f>=2&&f<8?1:0; // frames 2-7: torn out / ghost / snapping back = untargetable (~0.5 s)
+    if(f>=4&&!m.bj){m.bj=1;const v=G.speed*m.spd*(1-(m.slowT>0?m.slow:0));if(v>0){const a=[m.p[0],m.p[1]],b=m.bk;m.bk=null;_mvV(m,VX.blinkDist/v);m.bk=b;G.fx.push({x:a[0],y:a[1],c:'#ff3a7c',life:.3,max:.3,gl:1},{x:m.p[0],y:m.p[1],c:'#00f0ff',life:.3,max:.3,gl:1})}}
+    if(f>=8){m.bk=null;m.gh=0;m.bt=VX.blinkEvery[0]+Math.random()*(VX.blinkEvery[1]-VX.blinkEvery[0])}}}
+  if(m.k=='h'){m.sp=(m.sp+dt)%VX.shieldPeriod;const a=m.sp-(VX.shieldPeriod-VX.shieldDur);m.sha=a>=0?a:-1;m.shOn=a>=1/8}}  // shield anim = last 1 s of each 5 s; blocks from frame 1
+ _upV(dt);
+ for(const m of G.mobs)if(m.k=='j'&&(m.slowT>0||m.slow)){m.slowT=0;m.slow=0;m.imm=.6}}; // Trojan: glue slides off (slowed row as "immune" feedback)
+// ---- seen-type toasts (once per type, persisted) ----
+const VSEEN=(()=>{try{return new Set(JSON.parse(localStorage.getItem('td_seen_mobs')||'[]'))}catch(e){return new Set()}})();let VTOAST=[];
+function vSeen(k){if(VSEEN.has(k)||!VT[k]||!VT[k].tip)return;VSEEN.add(k);try{localStorage.setItem('td_seen_mobs',JSON.stringify([...VSEEN]))}catch(e){}VTOAST.push({k})}
+function drawVToast(){if(!VTOAST.length||SCREEN)return;const now=performance.now(),e=VTOAST[0];if(!e.s)e.s=now;const age=(now-e.s)/1000,D=4;if(age>D){VTOAST.shift();return}
+ const t=VT[e.k],txt='NEW: '+t.name+' — '+t.tip,fs=Math.round(13*U);X.save();X.font='800 '+fs+'px system-ui';const tw=Math.min(AV.r-AV.l-12,X.measureText(txt).width+fs*3.4),th=fs*2.3,cx=(AV.l+AV.r)/2,y=AV.t+34*U;
+ X.globalAlpha=Math.min(1,age*4,(D-age)*2);pill(cx-tw/2,y,tw,th,.85,t.col);drawSprite(VID[e.k],cx-tw/2+fs*1.4,y+th/2,fs*1.9,{state:'icon',id:0});
+ X.fillStyle='#f0faff';X.textAlign='left';X.textBaseline='middle';X.fillText(txt,cx-tw/2+fs*2.7,y+th/2,tw-fs*3.1);X.restore()}
+{const _dh=drawHUD;drawHUD=function(){_dh();drawVToast()}}
+// ---- drawing ----
+function mobType(m){return m.boss?'boss':VID[m.k]||'phage'}
+function vShieldFr(a){const D=VX.shieldDur,o=3/8,c=2/8;return a<o?Math.floor(a*8):a<D-c?3+Math.floor((a-o)*8)%3:Math.min(7,6+Math.floor((a-(D-c))*8))}
+{const _ms=mobState;mobState=function(m,now){const st=_ms(m,now);if(m.boss||!m.k)return st;
+ const vx=m.v?Math.cos(Math.atan2(m.v[1],m.v[0])+ROTA()):0;if(vx<-.3)m._fl=1;else if(vx>.3)m._fl=0;st.flip=!!m._fl; // side view: mirror when moving left on screen
+ if(m.hid>0){st.hid=1;return st}st.ox=(m.ofs||0)*cell;
+ if(m.atk)st.state='walk';
+ if(m.k=='j')st.state=m.imm>0?'slowed':'walk';
+ if((m._hitAt||0)>(m._fs||-1e9)+VX.flinchEvery)m._fs=m._hitAt;
+ if(m.bk!=null){st.state='blink';st.fr=Math.min(7,Math.floor(m.bk*VX.blinkFps));st.gh=m.gh>0;if(st.gh)st.hp=null}
+ else if(m.k=='h'&&m.sha>=0){st.state='shield';st.fr=vShieldFr(m.sha);st.sh=m.shOn;st.blk=now-(m._blk||-1e9)<160}
+ else if(now-(m._fs||-1e9)<VX.flinchMs){st.state='hit';st.t0=m._fs/1000}
+ return st}}
+function vProc(k){const c=VT[k].col,kk=k=='gm'?'g':k,sc=k=='gm'?.65:1;return(ctx,x,y,s,clk,st)=>{const ph=(clk.t*6+(st.id||0))%6.283,r=s*.3*sc*(1+.05*Math.sin(ph));X.save();X.translate(x,y);glow(c,s*.3);X.fillStyle='rgba(10,14,30,.9)';X.strokeStyle=c;X.lineWidth=Math.max(1.5,s*.05);X.beginPath();
+ if(kk=='f'){for(const[a,b]of[[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[1,1]])X.rect((a-.5)*r*.66,(b-.5)*r*.66,r*.66,r*.66)}
+ else if(kk=='g'){for(let i=0;i<6;i++){const a=i*1.047-.52;X.lineTo(Math.cos(a)*r,Math.sin(a)*r*.9-r*.2)}X.closePath();for(const sx of[-1,-.35,.35,1]){X.moveTo(sx*r*.35,r*.5);X.lineTo(sx*r*.9,r*1.05)}}
+ else if(kk=='h'){X.roundRect(-r*1.05,-r*.8,r*2.1,r*1.6,r*.2);X.moveTo(-r*1.05,-r*.38);X.lineTo(r*1.05,-r*.38)}
+ else if(kk=='i'){for(let i=0;i<3;i++){X.moveTo(-r*.7+i*r*.62+r*.3,0);X.arc(-r*.7+i*r*.62,0,r*(i==2?.42:.3),0,7)}}
+ else{X.arc(0,-r*.1,r*.85,Math.PI,0);X.lineTo(r*.85,r*.35);X.lineTo(-r*.85,r*.35);X.closePath();for(const sx of[-1,-.4,.4,1]){X.moveTo(sx*r*.6,r*.35);X.lineTo(sx*r,r*.9)}}
+ X.fill();X.stroke();X.shadowBlur=0;X.fillStyle='#fff';X.beginPath();X.arc(r*.05-r*.28,-r*.12,r*.14,0,7);X.arc(r*.05+r*.28,-r*.12,r*.14,0,7);X.fill();X.restore();
+ if(st.hp!=null&&st.state!='icon'){const bw=s*.6,bh=Math.max(3,s*.08),by=y-r-bh*2.6;X.fillStyle='#300';X.fillRect(x-bw/2,by,bw,bh);X.fillStyle=st.hp>.5?'#3f6':st.hp>.25?'#fc3':'#f33';X.fillRect(x-bw/2,by,bw*st.hp,bh)}}}
+for(const k in VID)defSprite(VID[k],vProc(k));
+const VIDS=new Set(Object.values(VID));
+{const _ds=drawSprite;drawSprite=function(type,x,y,s,st){if(!VIDS.has(type))return _ds(type,x,y,s,st);st=st||{};if(st.hid)return;x+=st.ox||0;
+ let ty=type;const s2=Object.assign({},st);
+ if(st.state=='hit'){const hs=SPRITES[type+'_hit'];if(hs&&sheetReady(hs.sheet))ty=type+'_hit';else s2.state='walk'}
+ const art=sheetReady((SPRITES[ty]||{}).sheet);if(!art)delete s2.fr;
+ X.save();if(st.flip){X.translate(x,0);X.scale(-1,1);X.translate(-x,0)}
+ if(!art&&st.gh){const j=s*.14;X.save();X.globalAlpha*=.35;_ds(ty,x-j,y,s,s2);_ds(ty,x+j,y,s,s2);X.restore();X.globalAlpha*=.35+.3*Math.random()}
+ _ds(ty,x,y,s,s2);X.restore();
+ if(!art&&st.gh){X.save();for(let i=0;i<3;i++){X.fillStyle=i%2?'rgba(0,240,255,.55)':'rgba(255,60,200,.55)';X.fillRect(x-s*.45+Math.random()*s*.2,y-s*.4+Math.random()*s*.8,s*(.4+Math.random()*.4),Math.max(1,s*.05))}X.restore()}
+ if(!art&&st.sh){const w=s*.95,h=s*.95,a=.55+.25*Math.sin(performance.now()/90);X.save();X.globalAlpha*=a;glow('#4aa8ff',s*.4);X.fillStyle=st.blk?'rgba(140,220,255,.35)':'rgba(74,168,255,.16)';X.strokeStyle='#9fe0ff';X.lineWidth=Math.max(1.5,s*.05);
+  X.beginPath();X.roundRect(x-w/2,y-h*.55,w,h,s*.1);X.fill();X.stroke();X.fillStyle='rgba(159,224,255,.5)';X.fillRect(x-w/2,y-h*.55,w,h*.14);X.shadowBlur=0;X.restore()}}}
+function drawVDeaths(){ART.vd=ART.vd.filter(e=>{const sp=SPRITES[e.id+'_death'],sh=sp&&sp.sheet;return ANIM.t-e.t0<(sh?sh.frames/sh.fps:0)+.05});
+ for(const e of ART.vd){const sh=SPRITES[e.id+'_death'].sheet;if(!sheetReady(sh))continue;const p=WP(e.x,e.y);X.save();if(e.fl){X.translate(p[0],0);X.scale(-1,1);X.translate(-p[0],0)}drawSheet(e.id,sh,p[0],p[1],cell,{state:'death',t0:e.t0});X.restore()}}
+{const _dxV=drawExtra;drawExtra=function(now){_dxV(now);drawVDeaths();for(const f of G.fx)if(f.gl&&!sheetReady((SPRITES.glitchy||{}).sheet)){const q=f.life/f.max,p=WP(f.x,f.y);X.save();X.globalAlpha=q*.8;X.fillStyle=f.c;for(let i=0;i<4;i++)X.fillRect(p[0]-cell*.4+Math.random()*cell*.3,p[1]-cell*.35+Math.random()*cell*.7,cell*(.3+Math.random()*.4),Math.max(1,cell*.05));X.restore()}}}
+ART_BASE.push(...Object.values(VID).flatMap(id=>[id,id+'_hit',id+'_death']));
+
 layout();
 addEventListener('pagehide',saveRun);addEventListener('beforeunload',saveRun);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRun()});
 // title screen must not leak the ⏩ hold
