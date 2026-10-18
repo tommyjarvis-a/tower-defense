@@ -239,7 +239,7 @@ function place(k,gx,gy){const c=key(gx,gy);if(G.coins<T[k].cost){G.msg='Not enou
 function tap(x,y){const p=[x,y],B=bounds(),H=hudBtns();
  for(const o of OV)if(inR(p,o.r)){o.act();return}
  if(inR(p,updToast())){doReload();return}
- if(inR(p,B.go)){if(G.over||G.won)reset();else if(G.paused)G.paused=false;else if(G.active){G.paused=true;G.hold=false}else startRound();return}
+ if(inR(p,B.go)){if(G.over||G.won)reset();else if(G.paused)G.paused=false;else if(G.active){G.paused=true}else startRound();return}
  if(G.over||G.won)return; // building/selling allowed while paused
  if(G.msgT<=0||G.msg=='Not enough coins')G.msg='';
  if(inR(p,G.upBtn)){upgrade(sel);return}
@@ -250,12 +250,12 @@ function tap(x,y){const p=[x,y],B=bounds(),H=hudBtns();
  sel=null;if(picked)place(picked,gx,gy)}
 // input: taps + hold-for-2x (touch, mouse, pointer)
 let holdTouch=null;const rel=(e)=>{const r=C.getBoundingClientRect(),a=e.clientX-r.left,b=e.clientY-r.top;return LOCK.css?[b,r.width-a]:[a,b]}; // undo the 90° CSS rotation of the landscape-lock fallback
-const onFast=p=>G.active&&!G.paused&&!G.over&&!G.won&&inR(p,hudBtns().fast);
-const release=()=>{holdTouch=null;if(G)G.hold=false};
+const onFast=p=>!SCREEN&&!G.over&&!G.won&&inR(p,hudBtns().fast); // 2x is a toggle (tap on / tap off), usable any time
+const release=()=>{holdTouch=null};
 
 ['touchend','touchcancel'].forEach(ev=>C.addEventListener(ev,e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===holdTouch)release()},{passive:false}));
 let MD=null; // mouse: press+release without moving = tap; drag beyond 8px = camera pan
-C.addEventListener('mousedown',e=>{const p=rel(e);if(onFast(p)){G.hold=true;return}MD={s:p,l:p,moved:false}});
+C.addEventListener('mousedown',e=>{const p=rel(e);if(onFast(p)){toggleFF();return}MD={s:p,l:p,moved:false}});
 addEventListener('mousemove',e=>{if(!MD||DRAG)return;const p=rel(e);if(!MD.moved&&Math.hypot(p[0]-MD.s[0],p[1]-MD.s[1])>8)MD.moved=true;if(MD.moved&&!SCREEN)panBy(p[0]-MD.l[0],p[1]-MD.l[1]);MD.l=p});
 addEventListener('mouseup',()=>{if(!MD)return;const m=MD;MD=null;if(!m.moved)tap(m.s[0],m.s[1])});
 addEventListener('mouseup',()=>{if(holdTouch==null)release()});
@@ -264,7 +264,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261018172129';
+const APP_VERSION='20261018173856';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
@@ -386,10 +386,10 @@ function pill(x,y,w,h,a,col){X.fillStyle='rgba(10,14,30,'+(a??.6)+')';X.strokeSt
 function circ(cx,cy,r,label,col,on,dis,sub){X.fillStyle=on?'rgba(0,240,255,.25)':'rgba(14,18,40,.85)';X.strokeStyle=dis?'#445':col;X.lineWidth=Math.max(2,r*.07);glow(dis?'transparent':col,on?r*.6:r*.35);X.beginPath();X.arc(cx,cy,r,0,7);X.fill();X.stroke();X.shadowBlur=0;
  X.fillStyle=dis?'#667':'#f0faff';X.textAlign='center';X.textBaseline='middle';X.font='800 '+Math.round(r*(sub?.62:.8))+'px system-ui';X.fillText(label,cx,cy-(sub?r*.16:0));if(sub){X.font='700 '+Math.round(r*.26)+'px system-ui';X.fillText(sub,cx,cy+r*.45)}}
 const sq=(cx,cy,r)=>[cx-r,cy-r,2*r,2*r];
-const goIcon=()=>G.over||G.won?'↻':G.paused?'▶':G.active?'⏸':'▶';
-const goSub=()=>G.over||G.won?'RESTART':G.paused?'RESUME':G.active?'PAUSE':(isBoss(G.wave+1)?'BOSS':'WAVE '+(G.wave+1));
-const goCol=()=>G.over?'#ff5a7a':G.paused?'#7dff4a':G.active?'#00f0ff':isBoss(G.wave+1)?'#ff3c6e':'#7dff4a';
-const fastDis=()=>!G.active||G.paused||G.over||G.won;
+let goIcon=()=>G.over||G.won?'↻':G.paused?'▶':G.active?'⏸':'▶';
+let goSub=()=>G.over||G.won?'RESTART':G.paused?'RESUME':G.active?'PAUSE':(isBoss(G.wave+1)?'BOSS':'WAVE '+(G.wave+1));
+let goCol=()=>G.over?'#ff5a7a':G.paused?'#7dff4a':G.active?'#00f0ff':isBoss(G.wave+1)?'#ff3c6e':'#7dff4a';
+const fastDis=()=>G.over||G.won;
 const STATS=()=>[['◉ '+G.coins,'#ffd84a'],['♥ '+G.lives,'#ff5a7a'],['Wave '+G.wave,isBoss(G.wave+1)||isBoss(G.wave)?'#ff3c6e':'#7df']];
 function stats(x,y,fs){X.font='800 '+fs+'px system-ui';X.textBaseline='middle';X.textAlign='left';let cx=x;for(const[t,c]of STATS()){X.fillStyle=c;X.fillText(t,cx,y);cx+=X.measureText(t).width+fs*.9}return cx}
 function statsW(fs){X.font='800 '+fs+'px system-ui';return STATS().reduce((a,[t])=>a+X.measureText(t).width+fs*.9,0)-fs*.9}
@@ -430,7 +430,7 @@ drawHUD=function(){const now=performance.now();fxFrame(now);postFrame(now);overl
  if(G.paused){let bx,by,pw;if(LAND){bx=AV.l;by=y0+5*U;pw=Math.min(150*U,x0-8*U-bx)}else{bx=SA.l+8*U;by=y0+ph+8*U;pw=Math.min(210*U,R.zx-8*U-bx)}
   if(pw>=70*U){const t=pw>=170*U?'⏸ PAUSED · build freely':'⏸ PAUSED';pill(bx,by,pw,26*U,.6,'rgba(125,221,255,.6)');X.fillStyle='#7df';X.font='700 '+Math.round(12*U)+'px system-ui';X.textAlign='center';X.textBaseline='middle';X.fillText(t,bx+pw/2,by+13*U)}}
  pill(...R.pill,.45);for(const k of KINDS)chip(R[k],k,picked==k);
- circ(R.fast[0]+R.fast[2]/2,R.fast[1]+R.fast[3]/2,R.fast[2]/2,'⏩',G.hold?'#ffd84a':'#7df',G.hold,fastDis(),G.hold?'2x':'HOLD');
+ circ(R.fast[0]+R.fast[2]/2,R.fast[1]+R.fast[3]/2,R.fast[2]/2,'⏩',G.hold?'#ffd84a':'#7df',G.hold,fastDis(),G.hold?'2x ON':'2x OFF');
  circ(R.go[0]+R.go[2]/2,R.go[1]+R.go[3]/2,R.go[2]/2,goIcon(),goCol(),G.paused,false,goSub())};
 const _tap=tap;
 tap=function(x,y){const p=[x,y];AUD.unlock();
@@ -588,7 +588,7 @@ function startPinch(){const[a,b]=[...TS.pts.values()];TS.pinch={d0:Math.hypot(a[
 function movePinch(){const[a,b]=[...TS.pts.values()],P=TS.pinch,d=Math.hypot(a[0]-b[0],a[1]-b[1]),m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
  const s0=[(P.m0[0]-P.t0[0])/P.z0,(P.m0[1]-P.t0[1])/P.z0],z=cl(1,CFG.MAX_ZOOM,P.z0*d/P.d0);VIEW.z=z;VIEW.tx=m[0]-z*s0[0];VIEW.ty=m[1]-z*s0[1];applyView()}
 C.style.touchAction='none';
-C.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches){const p=rel(t);if(onFast(p)){holdTouch=t.identifier;G.hold=true;continue}
+C.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches){const p=rel(t);if(onFast(p)){holdTouch=t.identifier;toggleFF();continue}
   TS.pts.set(t.identifier,p);if(TS.pts.size==1){TS.tapId=t.identifier;TS.start=p;TS.last=p;TS.moved=false;TS.multi=false}else{TS.multi=true;TS.tapId=null;if(TS.pts.size==2)startPinch()}}},{passive:false});
 C.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(TS.pts.has(t.identifier))TS.pts.set(t.identifier,rel(t));
  if(TS.pts.size>=2&&TS.pinch){if(!SCREEN)movePinch()}else if(TS.pts.size==1){const p=[...TS.pts.values()][0];if(TS.start&&Math.hypot(p[0]-TS.start[0],p[1]-TS.start[1])>8)TS.moved=true;if((TS.moved||!TS.start)&&TS.last&&!SCREEN)panBy(p[0]-TS.last[0],p[1]-TS.last[1]);TS.last=p}},{passive:false});
@@ -722,7 +722,7 @@ function bossDeaths(){for(const f of G.fx)if(f.t&&f.c=='#c060ff'&&!f._bd){f._bd=
 const SAVE_KEY='td_save_v2',OPT_KEY='td_opts_v1';
 const SL={master:['Master volume',0,100,100,'a'],music:['Music volume',0,100,100,'a'],sfx:['SFX volume',0,100,100,'a'],
  bloom:['Bloom / glow',0,200,100,'v'],sat:['Color saturation',0,200,100,'v'],fog:['Fog / smoke',0,200,100,'v'],haze:['Neon haze / vignette',0,100,0,'v'],bright:['Brightness',50,150,100,'v'],scan:['Scanlines / CRT',0,200,100,'v'],parts:['Particle density',0,200,100,'v']};
-const TG={shake:['Screen shake / glitch',true],fps:['Show FPS',false],lockLand:['Lock to landscape',false]};
+const TG={shake:['Screen shake / glitch',true],fps:['Show FPS',false],lockLand:['Lock to landscape',false],autoWave:['Auto-advance waves',false]};
 const OPT_DEF={};for(const k in SL)OPT_DEF[k]=SL[k][3];for(const k in TG)OPT_DEF[k]=TG[k][1];
 const OPTS=(()=>{let o={};try{o=JSON.parse(localStorage.getItem(OPT_KEY)||'{}')||{}}catch(e){o={}}if(typeof o!='object')o={};const r={...OPT_DEF}; // unknown/missing/out-of-range keys fall back to defaults (migrates older td_opts_v1)
  for(const k in SL)if(typeof o[k]=='number'&&isFinite(o[k]))r[k]=Math.round(cl(SL[k][1],SL[k][2],o[k]));for(const k in TG)if(typeof o[k]=='boolean')r[k]=o[k];return r})();
@@ -778,7 +778,7 @@ function drawScreens(now){UI=[];const w=W.clientWidth,h=W.clientHeight;
   X.fillStyle='#556';X.font='600 '+Math.round(10*U)+'px system-ui';X.fillText('Best wave '+bestWave()+'  ·  v'+APP_VERSION,cx,h-SA.b-14*U);return}
  if(SCREEN=='pause'){const ph=bh*3+gap*2,y0=h/2-ph/2+20*U;pill(cx-bw/2-16*U,y0-70*U,bw+32*U,ph+90*U,.75,'rgba(0,240,255,.6)');title(cx,y0-36*U,'PAUSED','#00f0ff',Math.min(32*U,w/10));
   B('▶ Resume','#7dff4a',closeMenu,false,y0);B('⚙ Options','#00f0ff',()=>{OPT_FROM='pause';SCREEN='options'},false,y0+bh+gap);
-  B('⌂ Home Screen','#ff3cc8',()=>{saveRun();G.hold=false;SCREEN='title'},false,y0+2*(bh+gap));return}
+  B('⌂ Home Screen','#ff3cc8',()=>{saveRun();SCREEN='title'},false,y0+2*(bh+gap));return}
  // options
  const two=w>h*1.15,colA=[['h','AUDIO & DISPLAY'],...['master','music','sfx'].map(k=>['s',k]),...Object.keys(TG).map(k=>['t',k])],colB=[['h','VISUAL'],...Object.keys(SL).filter(k=>SL[k][4]=='v').map(k=>['s',k])];
  const cols=two?[colA,colB]:[[...colA,...colB]],nr=Math.max(...cols.map(c=>c.length)),rw=two?Math.min(330*U,(w-36)/2):Math.min(340*U,w-24);SLR=[];
@@ -831,9 +831,9 @@ const _tap2=tap;tap=function(x,y){const p=[x,y];AUD.unlock();
  if(inR(p,R.zm)||inR(p,R.zp)){sfx('tap');zoomAt([(AV.l+AV.r)/2,(AV.t+AV.b)/2],VIEW.z*(inR(p,R.zp)?1.35:1/1.35));return}
  _tap2(x,y);if(!G.over&&!G.won){saveRun()}if(G.over)clearSave()};
 let MENU_PREV=false;
-function openMenu(){MENU_PREV=G.paused;G.paused=true;G.hold=false;SCREEN='pause';saveRun()}
+function openMenu(){MENU_PREV=G.paused;G.paused=true;SCREEN='pause';saveRun()}
 function closeMenu(){G.paused=MENU_PREV;SCREEN=null}
-function togglePlay(){if(SCREEN||G.over||G.won)return;if(G.paused)G.paused=false;else if(G.active){G.paused=true;G.hold=false;saveRun()}}
+function togglePlay(){if(SCREEN||G.over||G.won)return;if(G.paused)G.paused=false;else if(G.active){G.paused=true;saveRun()}}
 addEventListener('keydown',e=>{if(SCREEN=='title')return;const k=e.key;
  if(k==' '||k=='p'||k=='P'){e.preventDefault();togglePlay()}
  else if(k=='Escape'){if(SCREEN=='pause')closeMenu();else if(SCREEN=='options')optBack();else if(!G.over&&!G.won)openMenu()}});
@@ -859,7 +859,8 @@ function buildQueue(n){const base=waveInfo(n),gap=base.gap,q=[],R=Math.random,W=
  while(budget>.3){let r=R()*tot,k=ks[0];for(const kk of ks){r-=W[kk];if(r<=0){k=kk;break}}add(k)}
  if(force&&force!='i'&&q.length>3){const i=q.findIndex(e=>e.k==force);const[e]=q.splice(i,1);q.splice(Math.min(q.length,2+Math.floor(R()*3)),0,e)}
  return q}
-const _srV=startRound;startRound=function(){const was=G.active;_srV();if(!was&&G.active){G.queue=buildQueue(G.wave);G.spawnLeft=G.queue.length+(isBoss(G.wave)?1:0)}};
+const _srV=startRound;startRound=function(){const was=G.active;_srV();if(!was&&G.active){G.queue=tagQ(G.wave);G.spawnLeft=G.queue.length;G.open=[G.wave];G.wtot={[G.wave]:G.queue.length}}};
+function tagQ(n){const q=buildQueue(n).map(e=>Object.assign(e,{w:n}));if(isBoss(n))q.push({boss:1,w:n,gap:waveInfo(n).gap});return q} // entries carry their wave: overlapping (early-called) waves share one queue
 const vNoHit=m=>m.gh>0||m.si>0||m.shOn||m.hid>0; // glitching / just spawned / shielded / still inside the death animation
 function vSetHP(m,v){if(v>=m._h||v!==v){m._h=v;return}let d=m._h-v;
  if(vNoHit(m)){m._blk=performance.now();return}
@@ -872,20 +873,21 @@ function vType(m,k){const t=VT[k],g=Math.pow(1+HP_GROWTH,Math.max(0,G.wave-1)),h
  if(k=='h')m.sp=Math.random()*(VX.shieldPeriod-VX.shieldDur);
  if(k=='j')m.armor=VX.armor+VX.armorPerWave*G.wave;
  vSeen(k=='gm'?'g':k);return m}
-const _spV=spawn;spawn=function(boss){const m=_spV(boss);if(boss)return m;const e=(G.queue&&G.queue.shift())||{k:'g',gap:G.gap};vType(m,e.k);G.gap=e.gap;return m};
+const _spV=spawn;spawn=function(boss){const e=(G.queue&&G.queue.shift())||(boss?{boss:1,w:G.wave,gap:G.gap}:{k:'g',gap:G.gap,w:G.wave}),W0=G.wave;G.wave=e.w||W0;
+ const m=_spV(!!e.boss);if(!e.boss)vType(m,e.k);m.w=G.wave;m.ws=waveInfo(m.w).speed;G.wave=W0;G.gap=e.gap;return m}; // HP/speed from the mob's own wave
 // children appear when the parent's death animation ends, at the art's landing offsets (screen-x, tiles), then glide onto the path
-function vChild(p,k,ofs,wait){const c=_spV(false);vType(c,k);
+function vChild(p,k,ofs,wait){const W0=G.wave;G.wave=p.w||W0;const c=_spV(false);vType(c,k);G.wave=W0;c.w=p.w;c.ws=p.ws;
  Object.assign(c,{route:p.route,i:p.i,t:p.t,trav:p.trav,p:[p.p[0],p.p[1]],hid:VX.splitDelay,delay:VX.splitDelay+wait,si:VX.splitDelay+.2,ofs,_fl:p._fl});return c}
 function vDeath(m){if(!m.k)return;ART.vd.push({id:VID[m.k],x:m.p[0],y:m.p[1],t0:ANIM.t,fl:m._fl});
  if(m.k=='g')VX.gmOfs.forEach((o,i)=>vChild(m,'gm',o,i*.2));
  else if(m.k=='j')VX.jOfs.forEach((o,i)=>vChild(m,'f',o,i*.22))}
 ART.vd=[];
-const _mvV=moveMob;moveMob=function(m,dt){if(m.delay>0){m.delay-=dt;return}if(m.bk!=null)return;_mvV(m,dt)}; // waiting children / mid-blink: hold position
+const _mvV=moveMob;moveMob=function(m,dt){if(m.delay>0){m.delay-=dt;return}if(m.bk!=null)return;const S=G.speed;if(m.ws)G.speed=m.ws;try{_mvV(m,dt)}finally{G.speed=S}}; // waiting children / mid-blink: hold position
 const _upV=update;update=function(dt){
  for(const m of G.mobs){if(!m.k)continue;if(m.si>0)m.si-=dt;if(m.hid>0)m.hid-=dt;if(m.imm>0)m.imm-=dt;if(!(m.delay>0)&&m.ofs)m.ofs*=Math.max(0,1-dt/.3)<.02?0:Math.max(0,1-dt/.3);
   if(m.k=='f'){if(m.bk==null){m.bt-=dt;if(m.bt<=0&&!m.atk&&!(m.delay>0)){m.bk=0;m.bj=0}}
    if(m.bk!=null){m.bk+=dt;const f=m.bk*VX.blinkFps;m.gh=f>=2&&f<8?1:0; // frames 2-7: torn out / ghost / snapping back = untargetable (~0.5 s)
-    if(f>=4&&!m.bj){m.bj=1;const v=G.speed*m.spd*(1-(m.slowT>0?m.slow:0));if(v>0){const a=[m.p[0],m.p[1]],b=m.bk;m.bk=null;_mvV(m,VX.blinkDist/v);m.bk=b;G.fx.push({x:a[0],y:a[1],c:'#ff3a7c',life:.3,max:.3,gl:1},{x:m.p[0],y:m.p[1],c:'#00f0ff',life:.3,max:.3,gl:1})}}
+    if(f>=4&&!m.bj){m.bj=1;const v=(m.ws||G.speed)*m.spd*(1-(m.slowT>0?m.slow:0));if(v>0){const a=[m.p[0],m.p[1]],b=m.bk;m.bk=null;moveMob(m,VX.blinkDist/v);m.bk=b;G.fx.push({x:a[0],y:a[1],c:'#ff3a7c',life:.3,max:.3,gl:1},{x:m.p[0],y:m.p[1],c:'#00f0ff',life:.3,max:.3,gl:1})}}
     if(f>=8){m.bk=null;m.gh=0;m.bt=VX.blinkEvery[0]+Math.random()*(VX.blinkEvery[1]-VX.blinkEvery[0])}}}
   if(m.k=='h'){m.sp=(m.sp+dt)%VX.shieldPeriod;const a=m.sp-(VX.shieldPeriod-VX.shieldDur);m.sha=a>=0?a:-1;m.shOn=a>=1/8}}  // shield anim = last 1 s of each 5 s; blocks from frame 1
  _upV(dt);
@@ -935,6 +937,51 @@ function drawVDeaths(){ART.vd=ART.vd.filter(e=>{const sp=SPRITES[e.id+'_death'],
  for(const e of ART.vd){const sh=SPRITES[e.id+'_death'].sheet;if(!sheetReady(sh))continue;const p=WP(e.x,e.y);X.save();if(e.fl){X.translate(p[0],0);X.scale(-1,1);X.translate(-p[0],0)}drawSheet(e.id,sh,p[0],p[1],cell,{state:'death',t0:e.t0});X.restore()}}
 {const _dxV=drawExtra;drawExtra=function(now){_dxV(now);drawVDeaths();for(const f of G.fx)if(f.gl&&!sheetReady((SPRITES.glitchy||{}).sheet)){const q=f.life/f.max,p=WP(f.x,f.y);X.save();X.globalAlpha=q*.8;X.fillStyle=f.c;for(let i=0;i<4;i++)X.fillRect(p[0]-cell*.4+Math.random()*cell*.3,p[1]-cell*.35+Math.random()*cell*.7,cell*(.3+Math.random()*.4),Math.max(1,cell*.05));X.restore()}}}
 ART_BASE.push(...Object.values(VID).flatMap(id=>[id,id+'_hit',id+'_death']));
+
+// ===================== 2x TOGGLE · AUTO-ADVANCE · CALL NEXT WAVE EARLY =====================
+// 2x: tap/F toggles; survives pause/menu; kept for the browser session (sessionStorage), cleared by New Game.
+function toggleFF(){if(!G||G.over||G.won)return;G.hold=!G.hold;try{sessionStorage.setItem('td_ff',G.hold?'1':'0')}catch(e){}sfx('tap')}
+{const _ng=newGame;newGame=function(){_ng();G.hold=false;try{sessionStorage.setItem('td_ff','0')}catch(e){}}}
+{const _rs=restore;restore=function(d){_rs(d);G.hold=ssGet('td_ff')=='1'}}
+addEventListener('keydown',e=>{if(SCREEN)return;if(e.key=='f'||e.key=='F'){e.preventDefault();toggleFF()}});
+// Early call: while a wave runs, ▶ calls the next wave now (waves overlap). At most 1 wave ahead: blocked while an older wave is
+// still spawning, plus a 1.2 s cooldown against double taps. Bonus = round(remaining * (5 + 1.5*nextWave)),
+// remaining = share of the current wave still queued or alive (0..1).
+const EARLY={cd:1200,base:5,perWave:1.5,autoDelay:3};
+const earlyRem=()=>{const w=G.wave,tot=(G.wtot&&G.wtot[w])||1,q=(G.queue||[]).filter(e=>e.w==w).length,a=G.mobs.filter(m=>m.w==w&&!(m.hid>0)).length;return cl(0,1,(q+a)/tot)};
+const earlyBonus=()=>Math.round(earlyRem()*(EARLY.base+EARLY.perWave*(G.wave+1)));
+const canEarly=()=>G.active&&!G.paused&&!G.over&&!G.won&&!SCREEN&&(G.queue||[]).every(e=>e.w==G.wave)&&performance.now()-(G.lastEarly||-1e9)>EARLY.cd;
+function callEarly(){if(!canEarly())return false;const b=earlyBonus(),s=snapshot();G.lastEarly=performance.now();
+ G.wave++;const q=tagQ(G.wave);G.queue.push(...q);G.spawnLeft=G.queue.length;(G.open=G.open||[]).push(G.wave);(G.wtot=G.wtot||{})[G.wave]=q.length;
+ G.coins+=b;G.earlyFx={t:'+'+b,t0:performance.now()};G.early=(G.early||0)+1;G.earlyCoins=(G.earlyCoins||0)+b;
+ G.msg=isBoss(G.wave)?'⚠ BOSS WAVE ⚠ (called early +'+b+')':'Wave '+G.wave+' called early +'+b;G.msgT=2;sfx(isBoss(G.wave)?'boss':'wave');
+ SNAP=s;saveRun();return true} // reload restores to the start of the newly called (highest) wave
+// per-wave clear bonus for older overlapped waves (the newest one is paid by the normal completion check)
+{const _u=update;update=function(dt){const was=G.active;_u(dt);
+ if(G.open&&G.open.length){for(const w of G.open.slice())if(w<G.wave&&!(G.queue||[]).some(e=>e.w==w)&&!G.mobs.some(m=>m.w==w)&&!G.over){const b=25+w*5;G.coins+=b;G.open=G.open.filter(x=>x!=w);if(G.active){G.msg='Wave '+w+' cleared! +'+b;G.msgT=2}}
+  if(!G.active)G.open=[]}
+ if(was&&!G.active&&!G.over&&!G.won&&OPTS.autoWave)G.autoT=EARLY.autoDelay}}
+// auto-advance countdown runs on real time (not 2x), frozen while paused / in menus
+{const _a=advance;advance=function(dt){_a(dt);if(G.autoT>0){if(!OPTS.autoWave||G.active){G.autoT=0;return}if(!G.paused&&!G.over&&!G.won&&!SCREEN){G.autoT-=dt;if(G.autoT<=0){G.autoT=0;startRound()}}}}}
+{const _sr=startRound;startRound=function(){G.autoT=0;return _sr()}}
+// Play button labels: early-call while a wave runs
+{const gi=goIcon,gs=goSub,gc=goCol;
+ goIcon=()=>!G.over&&!G.won&&!G.paused&&G.active?'⏭':gi();
+ goSub=()=>{if(!G.over&&!G.won&&!G.paused&&G.active)return canEarly()?'EARLY +'+earlyBonus():'WAIT';if(G.autoT>0&&!G.active&&!G.paused)return 'AUTO '+Math.ceil(G.autoT);return gs()};
+ goCol=()=>!G.over&&!G.won&&!G.paused&&G.active?(canEarly()?(isBoss(G.wave+1)?'#ff3c6e':'#ffd84a'):'#556'):gc()}
+// Separate PAUSE button in the right-hand cluster (landscape: column MENU / PAUSE / 2x / PLAY; portrait: above MENU)
+{const _l=layout;layout=function(){_l();const br=31*U,mr=br*.75,sB=SA.b,sR=SA.r,h=W.clientHeight,w=W.clientWidth;
+ if(LAND){const gx=w-sR-br-12*U;R.pauseB=R.menuB;R.menuB=sq(gx,h-sB-7*br-48*U,mr)}
+ else R.pauseB=sq(R.menuB[0]+mr,R.menuB[1]-12*U-mr,mr)}}
+{const _d=drawHUD;drawHUD=function(){_d();if(SCREEN||!R.pauseB||G.over||G.won)return;const b=R.pauseB,r=b[2]/2,cx=b[0]+r,cy=b[1]+r,g=R.go,gr=g[2]/2,gx=g[0]+gr,gy=g[1]+gr;
+ circ(cx,cy,r,G.paused?'▶':'⏸',G.paused?'#7dff4a':'#7df',G.paused,false,G.paused?'RESUME':'PAUSE');
+ if(G.autoT>0&&!G.active){X.save();X.strokeStyle='#7dff4a';glow('#7dff4a',10*U);X.lineWidth=4*U;X.beginPath();X.arc(gx,gy,gr+5*U,-Math.PI/2,-Math.PI/2+2*Math.PI*(G.autoT/EARLY.autoDelay));X.stroke();X.restore()}
+ if(G.earlyFx){const q=(performance.now()-G.earlyFx.t0)/1100;if(q>=1)G.earlyFx=null;else{X.save();X.globalAlpha=1-q*q;X.fillStyle='#ffd84a';glow('#ffd84a',10*U);X.font='800 '+Math.round(18*U)+'px system-ui';X.textAlign='center';X.textBaseline='middle';
+  X.fillText(G.earlyFx.t,LAND?gx-gr-22*U:gx,LAND?gy-q*24*U:gy-gr-14*U-q*24*U);X.restore()}}}}
+{const _t=tap;tap=function(x,y){const p=[x,y];
+ if(!SCREEN&&G&&!G.over&&!G.won){if(R.pauseB&&inR(p,R.pauseB)){AUD.unlock();sfx('tap');if(G.paused)G.paused=false;else{G.paused=true;saveRun()}return}
+  if(inR(p,R.go)&&G.active&&!G.paused){AUD.unlock();if(callEarly())sfx('tap');return}}
+ return _t(x,y)}}
 
 layout();
 addEventListener('pagehide',saveRun);addEventListener('beforeunload',saveRun);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRun()});
