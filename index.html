@@ -264,7 +264,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261019034852';
+const APP_VERSION='20261019133810';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
@@ -411,7 +411,7 @@ layout=function(){dpr=window.devicePixelRatio||1;const w=W.clientWidth,h=W.clien
  // Prefer COVER (fills the screen edge to edge, e.g. iPhone Air 912x420 / 420x912 exactly) when the whole path incl. spawn/exit
  // still lands inside the unobstructed rect AV; otherwise shrink toward CONTAIN; last resort: contain inside AV (old behaviour).
  ROTd=h>w;const mc=ROTd?ROWS:COLS,mrw=ROTd?COLS:ROWS;
- const pathRect=(c,x0,y0)=>{const P=[[ENT[0],Y0],[EXI[0]+1,Y0+PH]].map(([gx,gy])=>ROTd?[x0+(ROWS-gy)*c,y0+gx*c]:[x0+gx*c,y0+gy*c]);return[Math.min(P[0][0],P[1][0]),Math.min(P[0][1],P[1][1]),Math.max(P[0][0],P[1][0]),Math.max(P[0][1],P[1][1])]};
+ const pathRect=(c,x0,y0)=>{const bb=MAP.bb||[ENT[0],Y0,EXI[0]+1,Y0+PH],P=[[bb[0],bb[1]],[bb[2],bb[3]]].map(([gx,gy])=>ROTd?[x0+(ROWS-gy)*c,y0+gx*c]:[x0+gx*c,y0+gy*c]);return[Math.min(P[0][0],P[1][0]),Math.min(P[0][1],P[1][1]),Math.max(P[0][0],P[1][0]),Math.max(P[0][1],P[1][1])]};
  const ok=c=>{const q=pathRect(c,(w-mc*c)/2,(h-mrw*c)/2);return q[0]>=AV.l-.5&&q[1]>=AV.t-.5&&q[2]<=AV.r+.5&&q[3]<=AV.b+.5};
  const cov=Math.max(w/mc,h/mrw),con=Math.min(w/mc,h/mrw);let c=cov;for(let i=0;i<24&&!ok(c);i++)c-=(cov-con)/24+1e-9;
  if(ok(c)){cell=c;ox=(w-mc*c)/2;oy=(h-mrw*c)/2;FIT=c>=cov-1e-6?'cover':'partial'}
@@ -730,7 +730,7 @@ function saveRun(){if(!G||SCREEN=='title'||G.over||G.won)return;if(G.wave==0&&!G
 function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}SNAP=null}
 const num=(v,a,b)=>typeof v=='number'&&isFinite(v)&&v>=a&&v<=b;
 function loadSave(){let raw=null,d;try{raw=localStorage.getItem(SAVE_KEY)}catch(e){}if(raw==null)return null;try{d=JSON.parse(raw)}catch(e){d=0}
- try{if(!d||d.v!==2||d.cols!==COLS||d.rows!==ROWS||!(d.seed=='classic'||num(d.seed,0,4294967295))||!num(d.coins,0,1e12)||!num(d.lives,1,1e6)||!num(d.wave,0,1e6)||!Array.isArray(d.towers)||!Array.isArray(d.bars))throw 0;
+ try{if(!d||d.v!==2||d.cols!==COLS||d.rows!==ROWS||!(d.seed=='classic'||num(d.seed,0,4294967295)||(d.seed=='custom'&&typeof lvCheck=='function'&&!lvCheck(d.lvl).err))||!num(d.coins,0,1e12)||!num(d.lives,1,1e6)||!num(d.wave,0,1e6)||!Array.isArray(d.towers)||!Array.isArray(d.bars))throw 0;
   for(const t of d.towers)if(!T[t.k]||t.k=='bar'||!num(t.x,0,COLS-1)||!num(t.y,0,ROWS-1)||!num(t.lvl,1,CFG.MAX_TOWER_LEVEL))throw 0;
   for(const b of d.bars)if(!num(b.x,0,COLS-1)||!num(b.y,0,ROWS-1)||!num(b.hp,0,1e9)||!num(b.lvl,1,CFG.MAX_TOWER_LEVEL))throw 0;return d}
  catch(e){try{localStorage.removeItem(SAVE_KEY)}catch(_){}console.warn('Neon TD: discarded corrupt save');return null}}
@@ -751,17 +751,18 @@ function drawScreens(now){UI=[];const w=W.clientWidth,h=W.clientHeight;
  X.fillStyle='rgba(4,6,16,.82)';X.fillRect(0,0,w,h);const g=X.createRadialGradient(w/2,h/2,Math.min(w,h)*.2,w/2,h/2,Math.max(w,h)*.7);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,10,30,.6)');X.fillStyle=g;X.fillRect(0,0,w,h);
  const cx=w/2,bw=Math.min(240*U,w-40),bh=Math.min(46*U,h/11),gap=Math.min(12*U,h/40);
  const B=(lab,col,act,dis,y)=>{const r=[cx-bw/2,y,bw,bh];btn(...r,lab,col,false,dis);if(!dis)UI.push({r,act,lab})};
- if(SCREEN=='title'){const sv=loadSave()||(LIVE?snapshot():null),sz=Math.min(54*U,w/7),y0=h/2-(bh*3+gap*2)/2+Math.min(30*U,h*.06);
+ if(SCREEN=='title'){const sv=loadSave()||(LIVE?snapshot():null),sz=Math.min(54*U,w/7),y0=h/2-(bh*4+gap*3)/2+Math.min(30*U,h*.06);
   title(cx,y0-sz*1.55,'NEON TD',['#00f0ff','#ff3cc8'][Math.floor(now/1600)%2&&Math.random()<.02?1:0],sz);X.fillStyle='#ff3cc8';glow('#ff3cc8',10*U);X.font='700 '+Math.round(Math.min(14*U,w/26))+'px system-ui';X.fillText('T O W E R   D E F E N S E',cx,y0-sz*.75);X.shadowBlur=0;
   if(ASK_NEW){X.fillStyle='#e8f8ff';X.font='600 '+Math.round(15*U)+'px system-ui';X.fillText('Start over? Your saved run will be erased.',cx,y0+bh*.3);
    const hw=(bw-gap)/2,y=y0+bh+gap;btn(cx-bw/2,y,hw,bh,'Erase & start','#ff5a7a',false,false);UI.push({r:[cx-bw/2,y,hw,bh],act:newGame});btn(cx-bw/2+hw+gap,y,hw,bh,'Cancel','#7df',false,false);UI.push({r:[cx-bw/2+hw+gap,y,hw,bh],act:()=>ASK_NEW=false});return}
   B('▶ Continue','#7dff4a',()=>{if(LIVE){SCREEN=null;return}const d=loadSave();if(d){restore(d);LIVE=true;SCREEN=null}},!sv&&!LIVE,y0);
-  if(sv){X.fillStyle='#9fe';X.font='600 '+Math.round(11*U)+'px system-ui';X.textAlign='center';X.fillText('Wave '+sv.wave+' · ◉'+sv.coins+' · ♥'+sv.lives+' · '+(sv.towers.length+sv.bars.length)+' builds',cx,y0+bh+gap*.55)}
-  B('✦ New Game','#00f0ff',()=>{if(loadSave()||(LIVE&&G.wave>0))ASK_NEW=true;else newGame()},false,y0+bh+gap*1.6);
+  if(sv){X.fillStyle='#9fe';X.font='600 '+Math.round(11*U)+'px system-ui';X.textAlign='center';X.fillText((sv.seed=='custom'&&sv.lvl?sv.lvl.name+' · ':'')+'Wave '+sv.wave+' · ◉'+sv.coins+' · ♥'+sv.lives+' · '+(sv.towers.length+sv.bars.length)+' builds',cx,y0+bh+gap*.55)}
+  B('✦ New Game','#00f0ff',()=>{if(lvAll().length){LVPAGE=0;SCREEN='start'}else if(loadSave()||(LIVE&&G.wave>0))ASK_NEW=true;else newGame()},false,y0+bh+gap*1.6);
   B('⚙ Options','#ff3cc8',()=>{OPT_FROM='title';SCREEN='options'},false,y0+2*bh+gap*2.6);
+  B('🛠 Build Mode','#ffd84a',()=>{LVPAGE=0;LVASK=null;SCREEN='levels'},false,y0+3*bh+gap*3.6);
   X.fillStyle='#556';X.font='600 '+Math.round(10*U)+'px system-ui';X.fillText('Best wave '+bestWave()+'  ·  v'+APP_VERSION,cx,h-SA.b-14*U);return}
  if(SCREEN=='pause'){const ph=bh*4+gap*3,y0=h/2-ph/2+20*U;pill(cx-bw/2-16*U,y0-70*U,bw+32*U,ph+90*U,.75,ASK_MAP?'rgba(255,90,122,.7)':'rgba(0,240,255,.6)');title(cx,y0-36*U,ASK_MAP?'NEW MAP?':'PAUSED',ASK_MAP?'#ff5a7a':'#00f0ff',Math.min(32*U,w/10));
-  if(ASK_MAP){X.fillStyle='#e8f8ff';X.font='600 '+Math.round(Math.min(14*U,bw/18))+'px system-ui';X.textAlign='center';X.textBaseline='middle';X.fillText('A new random map. This run will be lost.',cx,y0+bh*.5,bw+20*U);X.fillStyle='#9fe';X.font='600 '+Math.round(12*U)+'px system-ui';X.fillText('Current: Map #'+MAP.seed,cx,y0+bh*1.2);
+  if(ASK_MAP){X.fillStyle='#e8f8ff';X.font='600 '+Math.round(Math.min(14*U,bw/18))+'px system-ui';X.textAlign='center';X.textBaseline='middle';X.fillText('A new random map. This run will be lost.',cx,y0+bh*.5,bw+20*U);X.fillStyle='#9fe';X.font='600 '+Math.round(12*U)+'px system-ui';X.fillText('Current: '+(MAP.lvl?'“'+MAP.lvl.name+'”':'Map #'+MAP.seed),cx,y0+bh*1.2);
    B('✕ Cancel','#7df',()=>ASK_MAP=false,false,y0+2*(bh+gap));B('🗺 Yes, new map','#ff5a7a',newMapNow,false,y0+3*(bh+gap));return}
   B('▶ Resume','#7dff4a',closeMenu,false,y0);B('⚙ Options','#00f0ff',()=>{OPT_FROM='pause';SCREEN='options'},false,y0+bh+gap);
   B('🗺 New map','#ffd84a',()=>ASK_MAP=true,false,y0+2*(bh+gap));
@@ -921,7 +922,7 @@ const VIDS=new Set(Object.values(VID));
  if(!art&&st.sh){const w=s*.95,h=s*.95,a=.55+.25*Math.sin(performance.now()/90);X.save();X.globalAlpha*=a;glow('#4aa8ff',s*.4);X.fillStyle=st.blk?'rgba(140,220,255,.35)':'rgba(74,168,255,.16)';X.strokeStyle='#9fe0ff';X.lineWidth=Math.max(1.5,s*.05);
   X.beginPath();X.roundRect(x-w/2,y-h*.55,w,h,s*.1);X.fill();X.stroke();X.fillStyle='rgba(159,224,255,.5)';X.fillRect(x-w/2,y-h*.55,w,h*.14);X.shadowBlur=0;X.restore()}}}
 function drawVDeaths(){ART.vd=ART.vd.filter(e=>{const sp=SPRITES[e.id+'_death'],sh=sp&&sp.sheet;return ANIM.t-e.t0<(sh?sh.frames/sh.fps:0)+.05});
- for(const e of ART.vd){const sh=SPRITES[e.id+'_death'].sheet;if(!sheetReady(sh))continue;const p=WP(e.x,e.y);X.save();if(e.fl){X.translate(p[0],0);X.scale(-1,1);X.translate(-p[0],0)}drawSheet(e.id,sh,p[0],p[1],cell,{state:'death',t0:e.t0});X.restore()}}
+ for(const e of ART.vd){const sp=SPRITES[e.id+'_death'],sh=sp&&sp.sheet;if(!sh||!sheetReady(sh))continue;const p=WP(e.x,e.y);X.save();if(e.fl){X.translate(p[0],0);X.scale(-1,1);X.translate(-p[0],0)}drawSheet(e.id,sh,p[0],p[1],cell,{state:'death',t0:e.t0});X.restore()}}
 {const _dxV=drawExtra;drawExtra=function(now){_dxV(now);drawVDeaths();for(const f of G.fx)if(f.gl&&!sheetReady((SPRITES.glitchy||{}).sheet)){const q=f.life/f.max,p=WP(f.x,f.y);X.save();X.globalAlpha=q*.8;X.fillStyle=f.c;for(let i=0;i<4;i++)X.fillRect(p[0]-cell*.4+Math.random()*cell*.3,p[1]-cell*.35+Math.random()*cell*.7,cell*(.3+Math.random()*.4),Math.max(1,cell*.05));X.restore()}}}
 ART_BASE.push(...Object.values(VID).flatMap(id=>[id,id+'_hit',id+'_death']));
 
@@ -969,6 +970,182 @@ function callEarly(){if(!canEarly())return false;const b=earlyBonus(),s=snapshot
  if(!SCREEN&&G&&!G.over&&!G.won){if(R.pauseB&&inR(p,R.pauseB)){AUD.unlock();sfx('tap');if(G.paused)G.paused=false;else{G.paused=true;saveRun()}return}
   if(inR(p,R.go)&&G.active&&!G.paused){AUD.unlock();if(callEarly())sfx('tap');return}}
  return _t(x,y)}}
+
+// ===================== BUILD MODE: level editor + custom levels + water / lava hazards =====================
+// Level format (td_levels_v1): {id,name,t,rows:[ROWS strings of COLS chars]}  '.' grass  '#' path  'w' water  'l' lava  'E' entrance  'X' exit
+// Hazards sit ON the path (enemies walk through them); towers can't be built on any path tile, barricades can't go on hazards.
+const LV_KEY='td_levels_v1',LV_CH='.#wlEX',LV_MAX=60;
+const HAZ={water:{slow:.30,bossSlow:.15,base:.02,ramp:.04,max:.12,decay:2,trojanRamp:2,trojanMax:1.5},
+ lava:{burn:.10,after:1.5,afterBurn:.03,trojanMul:.5},cap:.65,trojanWaterCap:.8,bossCap:.25,bossMul:.5,maxFrac:1/3};
+let CUR_LVL=null,ED=null,LVPAGE=0,LVASK=null,STASK=null;
+function lvAll(){try{const d=JSON.parse(localStorage.getItem(LV_KEY)||'null');return d&&Array.isArray(d.levels)?d.levels.filter(l=>l&&!lvCheck(l).err):[]}catch(e){return[]}}
+function lvStore(a){try{localStorage.setItem(LV_KEY,JSON.stringify({v:1,levels:a}));return true}catch(e){return false}}
+const lvId=()=>Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36);
+const lvName=n=>String(n||'').replace(/[\u0000-\u001f]/g,'').trim().slice(0,24);
+// validation: returns {err,cells} (err '' when playable) plus parsed data
+function lvCheck(lv){const bad=(err,cells)=>({err,cells:cells||[]});
+ if(!lv||typeof lv!='object'||!Array.isArray(lv.rows)||lv.rows.length!=ROWS||lv.rows.some(r=>typeof r!='string'||r.length!=COLS||[...r].some(c=>!LV_CH.includes(c))))return bad('Level data is not a '+COLS+'×'+ROWS+' grid');
+ const at=(x,y)=>x>=0&&y>=0&&x<COLS&&y<ROWS?lv.rows[y][x]:'.',isP=(x,y)=>at(x,y)!='.',P=[],E=[],Xs=[],H={};
+ for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const c=at(x,y);if(c=='.')continue;P.push(key(x,y));if(c=='E')E.push(key(x,y));if(c=='X')Xs.push(key(x,y));if(c=='w'||c=='l')H[key(x,y)]=c}
+ if(E.length!=1)return bad(E.length?'Only one entrance allowed':'Place an entrance (IN)',E);if(Xs.length!=1)return bad(Xs.length?'Only one exit allowed':'Place an exit (OUT)',Xs);
+ for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS-1;x++)if(isP(x,y)&&isP(x+1,y)&&isP(x,y+1)&&isP(x+1,y+1))return bad('Path must be 1 tile wide (2×2 block)',[key(x,y),key(x+1,y),key(x,y+1),key(x+1,y+1)]);
+ const nb=k=>{const[x,y]=unk(k);return[[1,0],[-1,0],[0,1],[0,-1]].filter(([a,b])=>isP(x+a,y+b)).map(([a,b])=>key(x+a,y+b))};
+ const D={[E[0]]:0},q=[E[0]];while(q.length){const c=q.shift();for(const n of nb(c))if(D[n]==null){D[n]=D[c]+1;q.push(n)}}
+ if(D[Xs[0]]==null)return bad('Entrance and exit are not connected',[E[0],Xs[0]]);const loose=P.filter(k=>D[k]==null);if(loose.length)return bad('Path tiles not connected to the route',loose);
+ const dead=P.filter(k=>k!=E[0]&&k!=Xs[0]&&nb(k).length<2);if(dead.length)return bad('Dead end – every branch must rejoin',dead);
+ if(D[Xs[0]]<6)return bad('Route too short (min 6 tiles)',[E[0],Xs[0]]);
+ const nh=Object.keys(H).length;if(nh>Math.floor(P.length*HAZ.maxFrac))return bad('Too many hazards: max '+Math.floor(P.length*HAZ.maxFrac)+' of '+P.length+' path tiles',Object.keys(H));
+ return{err:'',cells:[],P,E:unk(E[0]),X:unk(Xs[0]),H,len:D[Xs[0]]}}
+window.lvCheck=lvCheck;
+// ---- custom map plumbing ----
+{const _sm=setMap;setMap=function(seed){if(seed=='custom'&&CUR_LVL){const c=lvCheck(CUR_LVL);if(!c.err){MAP.seed='custom';MAP.lvl=CUR_LVL;MAP.routes=0;MAP.haz=c.H;
+   ENT[0]=c.E[0];ENT[1]=c.E[1];EXI[0]=c.X[0];EXI[1]=c.X[1];PATH.clear();c.P.forEach(k=>PATH.add(k));NODES.clear();PATH.forEach(k=>NODES.add(k));
+   let x0=99,y0=99,x1=-1,y1=-1;for(const k of c.P){const[x,y]=unk(k);x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)}MAP.bb=[x0,y0,x1+1,y1+1];
+   PROTECT.clear();for(const e of[ENT+'',EXI+''])[e,...nbrs(e)].forEach(k=>PROTECT.add(k));return}}
+  if(seed=='custom')seed=null;ENT[0]=X0-1;EXI[0]=X0+PW;MAP.haz=null;MAP.bb=null;MAP.lvl=null;_sm(seed??newSeed())}}
+{const _r=reset;reset=function(seed){if(seed==null&&G&&MAP.seed=='custom'&&MAP.lvl){CUR_LVL=MAP.lvl;seed='custom'}return _r(seed)}} // Restart replays the same custom level
+{const _s=snapshot;snapshot=function(){const d=_s();if(MAP.seed=='custom'&&MAP.lvl)d.lvl={name:MAP.lvl.name,id:MAP.lvl.id,rows:MAP.lvl.rows.slice()};return d}}
+{const _rs=restore;restore=function(d){if(d&&d.seed=='custom')CUR_LVL=d.lvl;return _rs(d)}}
+{const _pl=place;place=function(k,gx,gy){if(k=='bar'&&MAP.haz&&MAP.haz[key(gx,gy)]){G.msg="Barricades can't go on "+(MAP.haz[key(gx,gy)]=='w'?'water':'lava');G.msgT=1.5;return false}return _pl(k,gx,gy)}}
+function playLevel(lv){const tm=window.TD_MAP;CUR_LVL=lv;window.TD_MAP='custom';try{newGame()}finally{window.TD_MAP=tm}}
+function startChoice(lv){const go=()=>{STASK=null;if(lv)playLevel(lv);else{const tm=window.TD_MAP;window.TD_MAP=null;try{newGame()}finally{window.TD_MAP=tm}}};
+ if(loadSave()||(LIVE&&G.wave>0&&!G.over))STASK={lv,go};else go()}
+// ---- hazards in play ----
+{const _mm=moveMob;moveMob=function(m,dt){const k=MAP.haz?MAP.haz[nearCell(m)]:null;m.hzK=k;if(k=='w'&&!(m.hid>0))dt*=1-(m.boss?HAZ.water.bossSlow:HAZ.water.slow);return _mm(m,dt)}}
+function hzHit(m,d){if(d<=0)return;if(m._h!==undefined){m._h-=d;m._hitAt=performance.now();if(m._h<=0&&!m._dd){m._dd=1;vDeath(m)}}else m.hp-=d;if(m.hp<=0)killMob(m)}
+{const _u=update;update=function(dt){_u(dt);if(!MAP.haz||!dt||G.over||G.won)return;const W_=HAZ.water,L_=HAZ.lava;let died=false;
+ for(const m of G.mobs){if(m.hp<=0||m._dd)continue;const k=m.hzK,tro=m.k=='j',safe=m.hid>0||m.si>0||m.gh>0;
+  if(k=='w')m.wt=(m.wt||0)+dt;else m.wt=Math.max(0,(m.wt||0)-dt*W_.decay);
+  if(k=='l')m.burn=L_.after;else if(m.burn>0)m.burn-=dt;
+  if(safe)continue;let f=0;
+  if(k=='w')f+=Math.min(W_.max*(tro?W_.trojanMax:1),W_.base+W_.ramp*(tro?W_.trojanRamp:1)*m.wt);              // drowning ramps with time spent in water; shields don't help
+  if(!m.shOn){if(k=='l')f+=L_.burn*(tro?L_.trojanMul:1);else if(m.burn>0)f+=L_.afterBurn*(tro?L_.trojanMul:1)} // Pop-Up shield blocks lava; Trojan armor halves it
+  if(!f)continue;if(m.boss)f*=HAZ.bossMul;const cap=m.boss?HAZ.bossCap:(tro&&k=='w'?HAZ.trojanWaterCap:HAZ.cap);m.hzF=m.hzF||0;
+  const df=Math.min(f*dt,cap-m.hzF);if(df<=0)continue;m.hzF+=df;hzHit(m,df*m.max);if(m.hp<=0){died=true;G.hzKills=(G.hzKills||0)+1;G.hzKind=(G.hzKind||{});G.hzKind[k||'l']=(G.hzKind[k||'l']||0)+1}
+  else if(Math.random()<dt*3)G.fx.push({x:m.p[0]+(Math.random()-.5)*.3,y:m.p[1]+(Math.random()-.5)*.3,c:k=='w'?'#40c8ff':'#ff7a20',life:.35,max:.35})}
+ if(died)G.mobs=G.mobs.filter(m=>m.hp>0)}}
+// neon hazard tiles (code-drawn placeholder art)
+function drawHaz(k,x,y,s,now,seed){X.save();if(k=='w'){X.fillStyle='#03203d';X.fillRect(x,y,s,s);const g=X.createLinearGradient(x,y,x,y+s);g.addColorStop(0,'rgba(40,160,255,.35)');g.addColorStop(1,'rgba(0,60,140,.15)');X.fillStyle=g;X.fillRect(x,y,s,s);
+  X.strokeStyle='rgba(90,220,255,.9)';X.lineWidth=Math.max(1,s*.05);glow('#30c8ff',s*.3);for(let i=0;i<3;i++){const yy=y+s*(.25+.25*i);X.beginPath();for(let j=0;j<=6;j++)X.lineTo(x+s*j/6,yy+Math.sin(now/260+j*1.1+i*1.9+seed)*s*.05);X.stroke()}
+  X.shadowBlur=0;X.strokeStyle='rgba(40,180,255,.75)';X.lineWidth=Math.max(1,s*.04);X.strokeRect(x+1,y+1,s-2,s-2)}
+ else{X.fillStyle='#2a0600';X.fillRect(x,y,s,s);const pu=.55+.45*Math.sin(now/330+seed*2.3),g=X.createRadialGradient(x+s*.5,y+s*.5,s*.05,x+s*.5,y+s*.5,s*.7);g.addColorStop(0,'rgba(255,170,40,'+(.75*pu)+')');g.addColorStop(.5,'rgba(255,70,0,'+(.45*pu)+')');g.addColorStop(1,'rgba(90,0,0,.2)');X.fillStyle=g;X.fillRect(x,y,s,s);
+  X.strokeStyle='#ffd060';X.lineWidth=Math.max(1,s*.045);glow('#ff5a00',s*.35);X.beginPath();const r=rng(Math.floor(seed*1e4)+7);for(let i=0;i<3;i++){X.moveTo(x+s*r(),y+s*r());for(let j=0;j<3;j++)X.lineTo(x+s*(.1+.8*r()),y+s*(.1+.8*r()))}X.stroke();
+  X.shadowBlur=0;X.strokeStyle='rgba(255,90,20,.8)';X.lineWidth=Math.max(1,s*.04);X.strokeRect(x+1,y+1,s-2,s-2)}X.restore()}
+{const _df=drawFrame;drawFrame=function(){_df();if(!MAP.haz)return;const now=performance.now();for(const k in MAP.haz){const[x,y]=unk(k);drawHaz(MAP.haz[k],...WT(x,y),cell,now,x*.37+y*.71)}}}
+// ---- DOM text modal (rename / name on save / export / import); lives inside #wrap so it follows the landscape-lock rotation ----
+function modal(o){const old=document.getElementById('tdm');if(old)old.remove();const d=document.createElement('div');d.id='tdm';
+ d.style.cssText='position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(2,4,12,.72);touch-action:auto;-webkit-user-select:text;user-select:text;font-family:system-ui,sans-serif';
+ const b=document.createElement('div');b.style.cssText='width:min(420px,86%);max-height:86%;display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #00f0ff;border-radius:14px;background:rgba(10,14,30,.96);box-shadow:0 0 18px rgba(0,240,255,.35);color:#e8f8ff';
+ const t=document.createElement('div');t.textContent=o.title;t.style.cssText='font-weight:800;color:#00f0ff;font-size:16px';b.appendChild(t);
+ if(o.note){const n=document.createElement('div');n.textContent=o.note;n.style.cssText='font-size:12px;color:#9fe';b.appendChild(n)}
+ const f=document.createElement(o.multi?'textarea':'input');f.value=o.value||'';if(o.readonly)f.readOnly=true;if(!o.multi){f.maxLength=24;f.type='text'}
+ f.style.cssText='box-sizing:border-box;width:100%;'+(o.multi?'height:38vh;font:11px ui-monospace,monospace;':'font-size:16px;')+'padding:8px;border-radius:8px;border:1px solid #445;background:#05070f;color:#e8f8ff;user-select:text;-webkit-user-select:text';b.appendChild(f);
+ const msg=document.createElement('div');msg.style.cssText='font-size:12px;color:#ff7a8a;min-height:14px';b.appendChild(msg);
+ const row=document.createElement('div');row.style.cssText='display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap';b.appendChild(row);
+ const close=()=>d.remove();for(const[lab,col,fn]of o.buttons){const k=document.createElement('button');k.textContent=lab;k.style.cssText='font:700 14px system-ui;padding:9px 14px;border-radius:10px;border:2px solid '+col+';background:#11162c;color:#e8f8ff';
+  k.onclick=()=>{const r=fn?fn(f.value,close):true;if(typeof r=='string')msg.textContent=r;else if(r!==false)close()};row.appendChild(k)}
+ d.addEventListener('keydown',e=>{e.stopPropagation();if(e.key=='Enter'&&!o.multi){row.firstChild.click()}else if(e.key=='Escape')close()});
+ ['touchstart','touchmove','touchend','mousedown','mouseup','wheel'].forEach(ev=>d.addEventListener(ev,e=>e.stopPropagation(),{passive:true}));
+ d.appendChild(b);W.appendChild(d);setTimeout(()=>{try{f.focus();if(!o.readonly&&!o.multi)f.select()}catch(e){}},30);return{d,f,msg}}
+const modalOpen=()=>!!document.getElementById('tdm');
+// ---- level list operations ----
+function lvSave(lv){const a=lvAll(),i=a.findIndex(l=>l.id==lv.id);if(i>=0)a[i]=lv;else{if(a.length>=LV_MAX)return'Level limit reached ('+LV_MAX+')';a.unshift(lv)}return lvStore(a)?'':'Could not save (storage full?)'}
+function lvDel(id){lvStore(lvAll().filter(l=>l.id!=id))}
+function lvUniq(n,id){const a=lvAll().filter(l=>l.id!=id).map(l=>l.name);let m=n,i=2;while(a.includes(m))m=(n.slice(0,20)+' '+(i++));return m}
+function lvExport(list){return JSON.stringify({v:1,game:'neon-td',levels:list.map(l=>({name:l.name,rows:l.rows}))},null,1)}
+function lvImport(txt){let d;try{d=JSON.parse(txt)}catch(e){return{err:'Not valid JSON'}}const arr=Array.isArray(d)?d:d&&Array.isArray(d.levels)?d.levels:d&&d.rows?[d]:null;if(!arr||!arr.length)return{err:'No levels found'};
+ const a=lvAll();let ok=0;const errs=[];for(const l of arr){const c=lvCheck(l);const n=lvName(l&&l.name)||'Imported';if(c.err){errs.push(n+': '+c.err);continue}if(a.length>=LV_MAX){errs.push('limit reached');break}
+  const nm=(()=>{let m=n,i=2;while(a.some(x=>x.name==m))m=n.slice(0,20)+' '+(i++);return m})();a.unshift({id:lvId(),name:nm,t:Date.now(),rows:l.rows.slice()});ok++}
+ if(ok)lvStore(a);return{ok,errs}}
+// ---- editor ----
+const TOOLS=[['#','Path','#b47cff','Path: the route enemies walk. 1 tile wide; forks are fine if every branch rejoins.'],['E','In','#7dff4a','Entrance: where enemies spawn (one per level).'],['X','Out','#ff5a7a','Exit: enemies leaving here cost lives (one per level).'],
+ ['w','Water','#30c8ff','Water (on path): slows 30%; drowning damage ramps the longer they stay. Trojans sink 2× faster.'],['l','Lava','#ff7a20','Lava (on path): heavy burn + 1.5 s afterburn. Pop-Up shield blocks it; Trojan armor halves it.'],['.','Erase','#9aa','Erase: back to grass (towers build on grass).']];
+function edOpen(lv){ED={id:lv?lv.id:null,name:lv?lv.name:'',g:(lv?lv.rows:Array(ROWS).fill('.'.repeat(COLS))).map(r=>[...r]),tool:'#',dirty:false,msg:'',err:null,ask:null,paint:null,undo:[]};SCREEN='editor'}
+const edRows=()=>ED.g.map(r=>r.join(''));
+function edL(){const w=W.clientWidth,h=W.clientHeight,rot=h>w*1.05,L={rot,w,h},l=SA.l+8,r=w-SA.r-8,t=SA.t+6,b=h-SA.b-6,g=6*U;
+ if(!rot){const tw=Math.min(78*U,(w-l-(w-r))*.11),bh=Math.min(44*U,(b-t-40*U-5*g)/6),aw=tw;L.top=[l+tw+10*U,t,r-l-2*tw-20*U,34*U];
+  L.tools=TOOLS.map((_,i)=>[l,t+i*(bh+g),tw,bh]);L.acts=[0,1,2,3,4].map(i=>[r-aw,t+i*(bh+g),aw,bh]);const gx=l+tw+10*U,gy=t+38*U,gw=r-aw-10*U-gx,gh=b-gy;L.cell=Math.min(gw/COLS,gh/ROWS);L.ox=gx+(gw-L.cell*COLS)/2;L.oy=gy+(gh-L.cell*ROWS)/2}
+ else{const bh=Math.min(46*U,(b-t)*.06),tw=(r-l-5*g)/6,aw=(r-l-4*g)/5;L.top=[l,t,r-l,40*U];const ay=b-bh,ty=ay-g-bh;L.tools=TOOLS.map((_,i)=>[l+i*(tw+g),ty,tw,bh]);L.acts=[0,1,2,3,4].map(i=>[l+i*(aw+g),ay,aw,bh]);
+  const gy=t+44*U,gh=ty-g-gy,gw=r-l;L.cell=Math.min(gw/ROWS,gh/COLS);L.ox=l+(gw-L.cell*ROWS)/2;L.oy=gy+(gh-L.cell*COLS)/2}
+ L.tile=(gx,gy)=>L.rot?[L.ox+(ROWS-1-gy)*L.cell,L.oy+gx*L.cell]:[L.ox+gx*L.cell,L.oy+gy*L.cell];
+ L.grid=L.rot?[L.ox,L.oy,ROWS*L.cell,COLS*L.cell]:[L.ox,L.oy,COLS*L.cell,ROWS*L.cell];
+ L.at=(sx,sy)=>{const a=Math.floor((sx-L.ox)/L.cell),b_=Math.floor((sy-L.oy)/L.cell);const gx=L.rot?b_:a,gy=L.rot?ROWS-1-a:b_;return gx>=0&&gy>=0&&gx<COLS&&gy<ROWS?[gx,gy]:null};return L}
+let EDL=null;
+function edSet(gx,gy){const t=ED.tool,g=ED.g;let c=g[gy][gx];
+ if(t=='E'||t=='X'){for(const r of g)for(let i=0;i<COLS;i++)if(r[i]==t)r[i]='#';g[gy][gx]=t}
+ else if(t=='.'){g[gy][gx]='.'}
+ else if(t=='#'){if(c=='.'||c=='w'||c=='l')g[gy][gx]='#'}
+ else{if(c=='E'||c=='X'){ED.msg="Hazards can't go on In/Out";return}g[gy][gx]=t}
+ if(g[gy][gx]!=c){ED.dirty=true;ED.err=null;ED.msg=''}}
+function edPaintAt(p,first){if(!EDL)return false;const c=EDL.at(p[0],p[1]);if(!c)return false;if(first){ED.undo.push(edRows());if(ED.undo.length>30)ED.undo.shift()}
+ if(ED.paint&&ED.paint.last&&!first){const[a,b]=ED.paint.last,n=Math.max(Math.abs(c[0]-a),Math.abs(c[1]-b));for(let i=1;i<=n;i++)edSet(Math.round(a+(c[0]-a)*i/n),Math.round(b+(c[1]-b)*i/n))}else edSet(c[0],c[1]);
+ if(ED.paint)ED.paint.last=c;return true}
+const edActive=()=>SCREEN=='editor'&&ED&&!ED.ask&&!modalOpen();
+C.addEventListener('touchstart',e=>{if(!edActive())return;for(const t of e.changedTouches){if(ED.paint)break;const p=rel(t);if(EDL&&EDL.at(p[0],p[1])){ED.paint={id:t.identifier,last:null};edPaintAt(p,true);if(ED.tool=='E'||ED.tool=='X')ED.paint.noDrag=1}}},{passive:true});
+C.addEventListener('touchmove',e=>{if(!edActive()||!ED.paint||ED.paint.noDrag)return;for(const t of e.changedTouches)if(t.identifier===ED.paint.id)edPaintAt(rel(t),false)},{passive:true});
+['touchend','touchcancel'].forEach(ev=>C.addEventListener(ev,e=>{if(ED&&ED.paint)for(const t of e.changedTouches)if(t.identifier===ED.paint.id)ED.paint=null},{passive:true}));
+C.addEventListener('mousedown',e=>{if(!edActive())return;const p=rel(e);if(EDL&&EDL.at(p[0],p[1])){ED.paint={id:'m',last:null};edPaintAt(p,true);if(ED.tool=='E'||ED.tool=='X')ED.paint.noDrag=1}});
+addEventListener('mousemove',e=>{if(ED&&ED.paint&&ED.paint.id=='m'&&!ED.paint.noDrag&&edActive())edPaintAt(rel(e),false)});
+addEventListener('mouseup',()=>{if(ED&&ED.paint&&ED.paint.id=='m')ED.paint=null});
+function edValidate(){const c=lvCheck({rows:edRows()});ED.err=c.err?c:null;ED.msg=c.err?'':'✓ Valid: route '+c.len+' tiles, '+Object.keys(c.H).length+' hazards';return!c.err}
+function edSave(then){if(!edValidate()){sfx('tap');return}
+ const doSave=nm=>{nm=lvName(nm);if(!nm)return'Give the level a name';const lv={id:ED.id||lvId(),name:lvUniq(nm,ED.id),t:Date.now(),rows:edRows()};const e=lvSave(lv);if(e)return e;ED.id=lv.id;ED.name=lv.name;ED.dirty=false;ED.msg='Saved “'+lv.name+'”';if(then)then(lv);return true};
+ if(ED.name&&ED.id){doSave(ED.name);return}
+ modal({title:'Save level',note:'Name this level (max 24 characters).',value:ED.name||('Level '+(lvAll().length+1)),buttons:[['💾 Save','#7dff4a',v=>doSave(v)],['Cancel','#7df',null]]})}
+function edBack(){if(ED.dirty){ED.ask='back';return}SCREEN='levels';ED=null}
+// ---- drawing helpers for the build screens ----
+function ub(r,lab,col,act,on,dis){btn(...r,lab,col,on,dis);if(!dis&&act)UI.push({r,act,lab})}
+function txt(s,x,y,sz,col,al,mw,wt){X.font=(wt||600)+' '+Math.round(sz)+'px system-ui';X.fillStyle=col;X.textAlign=al||'left';X.textBaseline='middle';X.fillText(s,x,y,mw)}
+function miniMap(rows,x,y,w,h){const c=Math.min(w/COLS,h/ROWS),ox_=x+(w-c*COLS)/2,oy_=y+(h-c*ROWS)/2;X.fillStyle='#0b1022';X.fillRect(ox_,oy_,c*COLS,c*ROWS);
+ for(let gy=0;gy<ROWS;gy++)for(let gx=0;gx<COLS;gx++){const ch=rows[gy][gx];if(ch=='.')continue;X.fillStyle={'#':'#6a48c8',w:'#30a8ff',l:'#ff6a10',E:'#7dff4a',X:'#ff5a7a'}[ch];X.fillRect(ox_+gx*c,oy_+gy*c,Math.ceil(c),Math.ceil(c))}}
+function drawEditor(now){const L=EDL=edL(),{w,h}=L;X.fillStyle='#050814';X.fillRect(0,0,w,h);
+ // grid
+ const[gx0,gy0,gw,gh]=L.grid;X.fillStyle='#0b1022';X.fillRect(gx0,gy0,gw,gh);const bad=new Set(ED.err?ED.err.cells:[]);
+ for(let gy=0;gy<ROWS;gy++)for(let gx=0;gx<COLS;gx++){const[x,y]=L.tile(gx,gy),c=L.cell,ch=ED.g[gy][gx];
+  if(ch=='.'){X.strokeStyle='rgba(60,90,160,.22)';X.lineWidth=1;X.strokeRect(x+.5,y+.5,c-1,c-1)}
+  else if(ch=='w'||ch=='l')drawHaz(ch,x,y,c,now,gx*.37+gy*.71);
+  else{drawPath(x,y,c);if(ch=='E'||ch=='X'){const col=ch=='E'?'#7dff4a':'#ff5a7a';X.fillStyle=col+'44';X.fillRect(x+1,y+1,c-2,c-2);X.strokeStyle=col;X.lineWidth=2;glow(col,8);X.strokeRect(x+2,y+2,c-4,c-4);X.shadowBlur=0;txt(ch=='E'?'IN':'OUT',x+c/2,y+c/2,Math.min(c*.36,11*U),'#fff','center',c-2,800)}}
+  if(bad.has(key(gx,gy))){X.strokeStyle='#ff3c6e';X.lineWidth=2;X.setLineDash([3,2]);X.strokeRect(x+1.5,y+1.5,c-3,c-3);X.setLineDash([])}}
+ X.strokeStyle='rgba(0,240,255,.45)';X.lineWidth=2;X.strokeRect(gx0-1,gy0-1,gw+2,gh+2);
+ // top bar: name + status / legend
+ const[tx,ty,tw,th]=L.top;pill(tx,ty,tw,th,.7);const tip=TOOLS.find(t=>t[0]==ED.tool);
+ txt('🛠 '+(ED.name||'Untitled level')+(ED.dirty?' •':''),tx+10*U,ty+th*.3,11.5*U,'#ffd84a','left',tw*.45,800);
+ const st=ED.err?'⚠ '+ED.err.err:ED.msg;if(st)txt(st,tx+tw-10*U,ty+th*.3,10.5*U,ED.err?'#ff7a8a':'#7dff4a','right',tw*.53,700);
+ txt(tip[3],tx+10*U,ty+th*.74,9.5*U,tip[2],'left',tw-20*U,600);
+ // palette + actions
+ TOOLS.forEach(([k,lab,col],i)=>{const r=L.tools[i];ub(r,'',col,()=>{ED.tool=k;ED.msg=''},ED.tool==k,false);const[x,y,bw,bh]=r,s=Math.min(bh*.42,bw*.36);
+  if(k=='w'||k=='l')drawHaz(k,x+bw/2-s/2,y+bh*.36-s/2,s,now,i);else{X.fillStyle=k=='.'?'#0b1022':k=='E'?'#7dff4a':k=='X'?'#ff5a7a':'#3a2a7a';X.fillRect(x+bw/2-s/2,y+bh*.36-s/2,s,s);X.strokeStyle=col;X.lineWidth=1.5;X.strokeRect(x+bw/2-s/2,y+bh*.36-s/2,s,s)}
+  txt(lab,x+bw/2,y+bh*.8,Math.min(11*U,bh*.26),ED.tool==k?'#fff':'#cde','center',bw-4,700)});
+ const A=[['💾 Save','#7dff4a',()=>edSave()],['▶ Play','#00f0ff',()=>edSave(lv=>{SCREEN='levels';ED=null;startChoice(lv)})],['↶ Undo','#b47cff',()=>{const u=ED.undo.pop();if(u){ED.g=u.map(r=>[...r]);ED.dirty=true;ED.err=null}},!ED.undo.length],['🗑 Clear','#ff5a7a',()=>{ED.ask='clear'}],['◀ Back','#7df',edBack]];
+ A.forEach(([lab,col,fn,dis],i)=>ub(L.acts[i],lab,col,fn,false,!!dis));
+ if(ED.ask){const cw=Math.min(300*U,w-40),ch=96*U,cx=(w-cw)/2,cy=(h-ch)/2;X.fillStyle='rgba(0,0,0,.55)';X.fillRect(0,0,w,h);UI=[];pill(cx,cy,cw,ch,.95,'#ff5a7a');
+  txt(ED.ask=='back'?'Discard unsaved changes?':'Clear the whole map?',cx+cw/2,cy+26*U,14*U,'#e8f8ff','center',cw-20,700);const bw=(cw-36*U)/2;
+  ub([cx+12*U,cy+ch-48*U,bw,38*U],ED.ask=='back'?'Discard':'Clear','#ff5a7a',()=>{if(ED.ask=='back'){ED.ask=null;SCREEN='levels';ED=null}else{ED.undo.push(edRows());ED.g=Array(ROWS).fill(0).map(()=>Array(COLS).fill('.'));ED.dirty=true;ED.err=null;ED.ask=null}});
+  ub([cx+24*U+bw,cy+ch-48*U,bw,38*U],'Cancel','#7df',()=>{ED.ask=null})}}
+function rowsPage(n,top,bot,rh){const per=Math.max(1,Math.floor((bot-top)/rh)),pages=Math.max(1,Math.ceil(n/per));LVPAGE=cl(0,pages-1,LVPAGE);return{per,pages,i0:LVPAGE*per}}
+function drawLevels(now,mode){const w=W.clientWidth,h=W.clientHeight;X.fillStyle='rgba(4,6,16,.92)';X.fillRect(0,0,w,h);const a=lvAll(),l=SA.l+12,r=w-SA.r-12,cx=w/2,t=SA.t+8,b=h-SA.b-8;
+ title(cx,t+20*U,mode=='start'?'NEW GAME':'BUILD MODE',mode=='start'?'#00f0ff':'#ffd84a',Math.min(28*U,w/12));
+ const fh=40*U,rw=Math.min(560*U,r-l),rx=cx-rw/2,rh=Math.min(54*U,(b-t)/6),top=t+44*U+(mode=='start'?fh+8*U:0),bot=b-fh-10*U;
+ if(mode=='start')ub([rx,t+44*U,rw,fh],'🎲 Random map (default)','#00f0ff',()=>startChoice(null));
+ const P=rowsPage(a.length,top,bot,rh+6*U);
+ if(!a.length)txt(mode=='start'?'No saved levels yet':'No levels yet – tap “+ New level” to draw one',cx,top+30*U,13*U,'#9fe','center',rw);
+ a.slice(P.i0,P.i0+P.per).forEach((lv,j)=>{const y=top+j*(rh+6*U);pill(rx,y,rw,rh,.7,LVASK&&LVASK.id==lv.id?'#ff5a7a':'rgba(0,240,255,.45)');const mw=rh*COLS/ROWS*.85;miniMap(lv.rows,rx+8*U,y+4*U,mw,rh-8*U);
+  const c=lvCheck(lv),nx=rx+16*U+mw,bw=Math.min(60*U,(rw-mw)*.15),bh=rh-14*U,by=y+7*U;
+  if(LVASK&&LVASK.id==lv.id){txt('Delete “'+lv.name+'”?',nx,y+rh/2,12.5*U,'#ff7a8a','left',rw-mw-2*bw-50*U,800);ub([rx+rw-2*bw-16*U,by,bw,bh],'Delete','#ff5a7a',()=>{lvDel(lv.id);LVASK=null});ub([rx+rw-bw-8*U,by,bw,bh],'Keep','#7df',()=>LVASK=null);return}
+  const nb=mode=='start'?1:4,tw=rw-mw-nb*(bw+6*U)-30*U;txt(lv.name,nx,y+rh*.36,12.5*U,'#e8f8ff','left',tw,800);txt('route '+c.len+' · '+Object.values(c.H).filter(v=>v=='w').length+' water · '+Object.values(c.H).filter(v=>v=='l').length+' lava',nx,y+rh*.7,10*U,'#9fe','left',tw,600);
+  const B_=[['▶ Play','#7dff4a',()=>startChoice(lv)]];if(mode!='start')B_.push(['✎ Edit','#00f0ff',()=>edOpen(lv)],['Aa','#ffd84a',()=>modal({title:'Rename level',value:lv.name,buttons:[['Rename','#7dff4a',v=>{v=lvName(v);if(!v)return'Name required';const L2=lvAll(),q=L2.find(x=>x.id==lv.id);if(q){q.name=lvUniq(v,lv.id);lvStore(L2)}return true}],['Cancel','#7df',null]]})],['🗑','#ff5a7a',()=>LVASK={id:lv.id}]);
+  B_.forEach(([lab,col,fn],i)=>ub([rx+rw-(nb-i)*(bw+6*U)-2*U,by,bw,bh],lab,col,fn))});
+ if(P.pages>1){txt((LVPAGE+1)+' / '+P.pages,cx,bot+2*U,10*U,'#9fe','center');ub([rx,bot-6*U,40*U,22*U],'◀','#7df',()=>LVPAGE--,false,LVPAGE==0);ub([rx+rw-40*U,bot-6*U,40*U,22*U],'▶','#7df',()=>LVPAGE++,false,LVPAGE>=P.pages-1)}
+ const F=mode=='start'?[['◀ Back','#7df',()=>{STASK=null;SCREEN='title'}]]:[['+ New level','#7dff4a',()=>edOpen(null)],['⬆ Import','#ffd84a',()=>modal({title:'Import levels',note:'Paste exported level JSON. Invalid levels are skipped.',multi:true,value:'',buttons:[['Import','#7dff4a',v=>{const r=lvImport(v);if(r.err)return r.err;if(!r.ok)return r.errs.join('; ');LVPAGE=0;return true}],['Cancel','#7df',null]]})],
+  ['⬇ Export','#00f0ff',()=>{const all=lvAll();modal({title:'Export levels ('+all.length+')',note:'Copy this text somewhere safe; paste it into Import to restore.',multi:true,readonly:true,value:lvExport(all),buttons:[['Copy','#7dff4a',(v)=>{try{navigator.clipboard.writeText(v)}catch(e){}const ta=document.querySelector('#tdm textarea');if(ta){ta.select();try{document.execCommand('copy')}catch(e){}}return 'Copied (or select all + copy)'}],['Close','#7df',null]]})},!lvAll().length],['◀ Back','#7df',()=>{LVASK=null;SCREEN='title'}]];
+ const fw=Math.min(150*U,(rw-(F.length-1)*8*U)/F.length),fx=cx-(F.length*fw+(F.length-1)*8*U)/2;F.forEach(([lab,col,fn,dis],i)=>ub([fx+i*(fw+8*U),b-fh,fw,fh],lab,col,fn,false,!!dis));
+ if(STASK){const cw=Math.min(320*U,w-40),ch=100*U,x=(w-cw)/2,y=(h-ch)/2;X.fillStyle='rgba(0,0,0,.6)';X.fillRect(0,0,w,h);UI=[];pill(x,y,cw,ch,.95,'#ff5a7a');
+  txt('Start over? Your saved run will be erased.',x+cw/2,y+28*U,13*U,'#e8f8ff','center',cw-20,700);const bw=(cw-36*U)/2;ub([x+12*U,y+ch-48*U,bw,38*U],'Erase & start','#ff5a7a',()=>STASK.go());ub([x+24*U+bw,y+ch-48*U,bw,38*U],'Cancel','#7df',()=>STASK=null)}}
+{const _ds=drawScreens;drawScreens=function(now){if(SCREEN=='editor'&&ED){UI=[];drawEditor(now);return}if(SCREEN=='levels'||SCREEN=='start'){UI=[];drawLevels(now,SCREEN);return}EDL=null;return _ds(now)}}
+addEventListener('keydown',e=>{if(SCREEN!='editor'&&SCREEN!='levels'&&SCREEN!='start')return;e.stopImmediatePropagation();if(modalOpen())return;
+ if(e.key=='Escape'){if(SCREEN=='editor'){if(ED.ask)ED.ask=null;else edBack()}else{LVASK=null;STASK=null;SCREEN='title'}}
+ else if(SCREEN=='editor'&&!ED.ask){const i='123456'.indexOf(e.key);if(i>=0)ED.tool=TOOLS[i][0];if((e.ctrlKey||e.metaKey)&&e.key=='z'){const u=ED.undo.pop();if(u){ED.g=u.map(r=>[...r]);ED.dirty=true}}}},true);
+Object.assign(window,{edOpen,playLevel,lvAll,lvStore,lvImport,lvExport,HAZ});
 
 // ===================== TOWER INFO CARD (placed tower or build-bar pick) + double-tap zoom reset =====================
 {const VV=(k)=>VT[k].name,armAt=()=>VX.armor+VX.armorPerWave*Math.max(G.wave||1,7),armPct=d=>Math.round(Math.max(d*VX.armorMin,d-armAt())/d*100);
