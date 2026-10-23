@@ -264,7 +264,7 @@ addEventListener('blur',release);document.addEventListener('visibilitychange',re
 C.addEventListener('mouseleave',()=>{if(holdTouch==null)release()});
 ['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 // ---- auto-update (GitHub Pages caches 10 min; no service worker) ----
-const APP_VERSION='20261019133810';
+const APP_VERSION='20261023010030';
 let UPD=null;const ssGet=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},ssSet=k=>{try{sessionStorage.setItem(k,'1')}catch(e){}};
 function doReload(){const k='td_reloaded_'+UPD;if(ssGet(k))return false;ssSet(k);location.replace(location.pathname+'?v='+encodeURIComponent(UPD));return true}
 // auto-reload only when it can't cost the player anything: no wave running and no progress (or game finished); otherwise show a tap-to-reload toast
@@ -406,15 +406,18 @@ layout=function(){dpr=window.devicePixelRatio||1;const w=W.clientWidth,h=W.clien
   const avail=R.menuB[0]-10*U-sL;let rows=1,cols=n,cs=Math.min(48*U,(avail-g)/n-g);if(cs<40*U){rows=2;cols=Math.ceil(n/2);cs=Math.min(46*U,(avail-g)/cols-g)}
   const pw=cols*(cs+g)+g,ph=rows*(cs+g)+g+4*U;R.pill=[sL+Math.max(8*U,Math.min((w-pw)/2-sL,R.menuB[0]-pw-10*U-sL)),h-sB-ph-12*U,pw,ph];KINDS.forEach((k,i)=>R[k]=[R.pill[0]+g+(i%cols)*(cs+g),R.pill[1]+g+2*U+Math.floor(i/cols)*(cs+g),cs,cs]);
   AV={l:sL,r:w-sR,t:HH,b:Math.min(R.pill[1],R.menuB[1],R.fast[1])-6*U}}
+ {const bh=Math.round((LAND?54:78)*U),bb=LAND?AV.b:Math.min(AV.b,R.menuB[1]-12*U-1.5*br-6*U),y=bb-bh;R.tbar=LAND?[AV.l,y,AV.r-AV.l,bh]:[sL+8*U,y,w-sL-sR-16*U,bh];AV.b=y-6*U} // TOWER BAR slot
  VL=AV.l;VR=w-AV.r;
  // ---- default fit (map never stretches: one square tile size). Portrait rotates the map 90deg so its long side runs down the screen.
  // Prefer COVER (fills the screen edge to edge, e.g. iPhone Air 912x420 / 420x912 exactly) when the whole path incl. spawn/exit
  // still lands inside the unobstructed rect AV; otherwise shrink toward CONTAIN; last resort: contain inside AV (old behaviour).
  ROTd=h>w;const mc=ROTd?ROWS:COLS,mrw=ROTd?COLS:ROWS;
  const pathRect=(c,x0,y0)=>{const bb=MAP.bb||[ENT[0],Y0,EXI[0]+1,Y0+PH],P=[[bb[0],bb[1]],[bb[2],bb[3]]].map(([gx,gy])=>ROTd?[x0+(ROWS-gy)*c,y0+gx*c]:[x0+gx*c,y0+gy*c]);return[Math.min(P[0][0],P[1][0]),Math.min(P[0][1],P[1][1]),Math.max(P[0][0],P[1][0]),Math.max(P[0][1],P[1][1])]};
- const ok=c=>{const q=pathRect(c,(w-mc*c)/2,(h-mrw*c)/2);return q[0]>=AV.l-.5&&q[1]>=AV.t-.5&&q[2]<=AV.r+.5&&q[3]<=AV.b+.5};
- const cov=Math.max(w/mc,h/mrw),con=Math.min(w/mc,h/mrw);let c=cov;for(let i=0;i<24&&!ok(c);i++)c-=(cov-con)/24+1e-9;
- if(ok(c)){cell=c;ox=(w-mc*c)/2;oy=(h-mrw*c)/2;FIT=c>=cov-1e-6?'cover':'partial'}
+ const inA=(c,x,y)=>{const q=pathRect(c,x,y);return q[0]>=AV.l-.5&&q[1]>=AV.t-.5&&q[2]<=AV.r+.5&&q[3]<=AV.b+.5};
+ const pos=c=>{const MW=mc*c,MH=mrw*c;let x=(w-MW)/2,y=(h-MH)/2;if(inA(c,x,y))return[x,y];const q=pathRect(c,0,0);x=(AV.l+AV.r-q[0]-q[2])/2;y=(AV.t+AV.b-q[1]-q[3])/2;if(MW>=w)x=cl(w-MW,0,x);if(MH>=h)y=cl(h-MH,0,y);return inA(c,x,y)?[x,y]:null};
+ const ok=c=>!!pos(c);
+ const cov=Math.max(w/mc,h/mrw),con=Math.min(w/mc,h/mrw,cov*.62);let c=cov;for(let i=0;i<48&&!ok(c);i++)c-=(cov-con)/48+1e-9;
+ if(ok(c)){cell=c;[ox,oy]=pos(c);FIT=c>=cov-1e-6?'cover':'partial'}
  else{cell=Math.max(4,Math.min((AV.r-AV.l)/mc,(AV.b-AV.t)/mrw));ox=AV.l+(AV.r-AV.l-cell*mc)/2;oy=AV.t+(AV.b-AV.t-cell*mrw)/2;FIT='contain-av'}};
 bounds=function(){return R};
 drawHUD=function(){const now=performance.now();fxFrame(now);postFrame(now);overlayWorld();const w=W.clientWidth,h=W.clientHeight,fs=Math.round(15*U);
@@ -882,10 +885,20 @@ const _upV=update;update=function(dt){
  for(const m of G.mobs)if(m.k=='j'&&(m.slowT>0||m.slow)){m.slowT=0;m.slow=0;m.imm=.6}}; // Trojan: glue slides off (slowed row as "immune" feedback)
 // ---- seen-type toasts (once per type, persisted) ----
 const VSEEN=(()=>{try{return new Set(JSON.parse(localStorage.getItem('td_seen_mobs')||'[]'))}catch(e){return new Set()}})();let VTOAST=[];
-function vSeen(k){if(VSEEN.has(k)||!VT[k]||!VT[k].tip)return;VSEEN.add(k);try{localStorage.setItem('td_seen_mobs',JSON.stringify([...VSEEN]))}catch(e){}VTOAST.push({k})}
-let VTR=null;function drawVToast(){VTR=null;if(!VTOAST.length||SCREEN)return;const now=performance.now(),e=VTOAST[0];if(!e.s)e.s=now;const age=(now-e.s)/1000,D=4;if(age>D){VTOAST.shift();return}
- const t=VT[e.k],txt='NEW: '+t.name+' — '+t.tip,fs=Math.round(13*U);X.save();X.font='800 '+fs+'px system-ui';const tw=Math.min(AV.r-AV.l-12,X.measureText(txt).width+fs*3.4),th=fs*2.3,cx=(AV.l+AV.r)/2,y=AV.t+34*U;VTR=[cx-tw/2,y,tw,th];
- X.globalAlpha=Math.min(1,age*4,(D-age)*2);pill(cx-tw/2,y,tw,th,.85,t.col);drawSprite(VID[e.k],cx-tw/2+fs*1.4,y+th/2,fs*1.9,{state:'icon',id:0});
+const VT_INTRO={f:1,g:1,h:3,i:5,j:7};
+function vSeen(k){if(VSEEN.has(k)||!VT[k]||!VT[k].tip)return;VSEEN.add(k);const w=G?G.wave||1:1,iw=VT_INTRO[k]||1;if(w>iw+2){for(const[kk,ww]of Object.entries(VT_INTRO))if(ww<w)VSEEN.add(kk);try{localStorage.setItem('td_seen_mobs',JSON.stringify([...VSEEN]))}catch(e){}return}try{localStorage.setItem('td_seen_mobs',JSON.stringify([...VSEEN]))}catch(e){}VTOAST.push({k,q:performance.now(),gt:G?G.time||0:0,w})}
+let VTR=null;
+// NEW-virus toast: once per type (td_seen_mobs), ~3 s on screen (2.2 s while others wait), stale queued ones (>8 s) are dropped,
+// and it sits at the top or bottom of the play area, whichever covers less path (path cells near the entrance count 6x).
+function drawVToast(){VTR=null;if(!VTOAST.length||SCREEN)return;const now=performance.now();
+ const gt=G?G.time||0:0,gw=G?G.wave||1:1;while(VTOAST.length&&!VTOAST[0].s&&(now-(VTOAST[0].q||now)>5000||gt-(VTOAST[0].gt||0)>4||(VTOAST[0].w&&VTOAST[0].w<gw)))VTOAST.shift();if(!VTOAST.length)return;
+ const e=VTOAST[0];if(!e.s){e.s=now;e.g0=gt}const age=Math.max((now-e.s)/1000,(gt-(e.g0??gt))*(G&&G.hold?.45:.8)),D=VTOAST.length>1?2.2:3;if(age>D||(e.w&&e.w<gw-1)){VTOAST.shift();return}
+ const t=VT[e.k],txt='NEW: '+t.name+' — '+t.tip,fs=Math.round(13*U);X.save();X.font='800 '+fs+'px system-ui';const tw=Math.min(AV.r-AV.l-12,X.measureText(txt).width+fs*3.4),th=fs*2.3,cx=(AV.l+AV.r)/2;
+ if(e.y==null||e.L!==W.clientWidth+'x'+W.clientHeight){const cand=[AV.t+8*U,AV.b-th-8*U];let best=null;
+  cand.forEach((y,i)=>{const r=[cx-tw/2-4,y-4,tw+8,th+8];let sc=i*.5;for(const c of PATH){const[gx,gy]=unk(c),q=WP(gx+.5,gy+.5);if(inR(q,r))sc+=Math.abs(gx-ENT[0])+Math.abs(gy-ENT[1])<=5?6:1}
+   const en=WP(ENT[0]+.5,ENT[1]+.5);if(inR(en,r))sc+=12;if(!best||sc<best.sc)best={y,sc}});e.y=best.y;e.L=W.clientWidth+'x'+W.clientHeight}
+ const y=e.y;VTR=[cx-tw/2,y,tw,th];
+ X.globalAlpha=Math.max(0,Math.min(1,age*4,(D-age)*2));pill(cx-tw/2,y,tw,th,.85,t.col);drawSprite(VID[e.k],cx-tw/2+fs*1.4,y+th/2,fs*1.9,{state:'icon',id:0});
  X.fillStyle='#f0faff';X.textAlign='left';X.textBaseline='middle';X.fillText(txt,cx-tw/2+fs*2.7,y+th/2,tw-fs*3.1);X.restore()}
 {const _dh=drawHUD;drawHUD=function(){_dh();drawVToast()}}
 // ---- drawing ----
@@ -935,7 +948,7 @@ addEventListener('keydown',e=>{if(SCREEN)return;if(e.key=='f'||e.key=='F'){e.pre
 // Early call: while a wave runs, ▶ calls the next wave now (waves overlap). At most 1 wave ahead: blocked while an older wave is
 // still spawning, plus a 1.2 s cooldown against double taps. Bonus = round(remaining * (5 + 1.5*nextWave)),
 // remaining = share of the current wave still queued or alive (0..1).
-const EARLY={cd:1200,base:5,perWave:1.5,autoDelay:3};
+const EARLY={cd:1200,base:5,perWave:1.5,autoDelay:3.5}; // auto-advance runs with the 3.5 s round-cleared band
 const earlyRem=()=>{const w=G.wave,tot=(G.wtot&&G.wtot[w])||1,q=(G.queue||[]).filter(e=>e.w==w).length,a=G.mobs.filter(m=>m.w==w&&!(m.hid>0)).length;return cl(0,1,(q+a)/tot)};
 const earlyBonus=()=>Math.round(earlyRem()*(EARLY.base+EARLY.perWave*(G.wave+1)));
 const canEarly=()=>G.active&&!G.paused&&!G.over&&!G.won&&!SCREEN&&(G.queue||[]).every(e=>e.w==G.wave)&&performance.now()-(G.lastEarly||-1e9)>EARLY.cd;
@@ -1210,17 +1223,69 @@ Object.assign(window,{edOpen,playLevel,lvAll,lvStore,lvImport,lvExport,HAZ});
   else{const ok=G.coins>=T[k].cost;X.font='800 '+fs+'px system-ui';X.fillStyle=ok?'#ffd84a':'#ff5a7a';X.fillText('◉'+T[k].cost+(ok?'':'  (need '+(T[k].cost-G.coins)+')'),x+pad,y+ch-pad-lh*.45);
    X.textAlign='right';X.font='600 '+Math.round(fs*.82)+'px system-ui';X.fillStyle='#9fe';X.fillText(k=='bar'?'tap a path cell':'tap grass to build',x+cw-pad,y+ch-pad-lh*.45)}
   X.restore()}
- window.cardRect=()=>CARD;window.cardOnly=drawCard;
- {const _dh=drawHUD;drawHUD=function(){_dh();drawCard()}}
+ window.cardRect=()=>TBR;window.cardOnly=drawTBar;
+ {const _dh=drawHUD;drawHUD=function(){_dh();drawTBar()}}
  // taps: the card swallows taps on itself (buttons still work); double-tap on empty map resets zoom
  let DT=null;
  {const _t=tap;tap=function(x,y){const p=[x,y];
-  if(!SCREEN&&CARD&&inR(p,CARD)&&!inR(p,G.upBtn)&&!inR(p,G.sellBtn))return;
-  if(!SCREEN&&!picked&&inR(p,[AV.l,AV.t,AV.r-AV.l,AV.b-AV.t])&&![R.go,R.fast,R.pauseB,R.menuB,R.pill,R.stats,CARD].some(r=>inR(p,r))){const g=SG(x,y),gx=Math.floor(g[0]),gy=Math.floor(g[1]);
+  if(!SCREEN&&TBR&&inR(p,TBR)&&!inR(p,G.upBtn)&&!inR(p,G.sellBtn))return;
+  if(!SCREEN&&!picked&&inR(p,[AV.l,AV.t,AV.r-AV.l,AV.b-AV.t])&&![R.go,R.fast,R.pauseB,R.menuB,R.pill,R.stats,TBR].some(r=>inR(p,r))){const g=SG(x,y),gx=Math.floor(g[0]),gy=Math.floor(g[1]);
    const empty=!G.towers.some(t=>t.x==gx&&t.y==gy)&&!barAt(key(gx,gy)),now=performance.now();
    if(empty){if(DT&&now-DT.t<400&&Math.hypot(x-DT.p[0],y-DT.p[1])<30){DT=null;if(VIEW.z>1.001){resetZoom();sfx('tap')}sel=null;return}DT={t:now,p}}else DT=null}else DT=null;
   return _t(x,y)}}
 }
+
+// ===================== TOWER BAR: one row along the bottom (replaces the floating card), selection ring, 3.5 s round-cleared band =====================
+// The bar lives in a slot that layout() always reserves (R.tbar) under the play area, so the map never sits beneath it and never re-fits
+// when a tower is (de)selected; the bar itself slides up with a short ease only while a tower (or a build-bar pick) is selected.
+var TBR=null,TBA=0,TBL=null,TBT=0;
+function tbRing(t){const c=WP(t.x+.5,t.y+.5),col=(T[t.k]||{}).col||'#00f0ff',r=cell*.64,a=performance.now()/1000;
+ X.save();X.strokeStyle=col;X.lineWidth=Math.max(1.5,2*U);glow(col,10*U);X.setLineDash([cell*.3,cell*.13]);X.lineDashOffset=-a*cell*.5;
+ X.beginPath();X.arc(c[0],c[1],r,0,7);X.stroke();X.setLineDash([]);X.globalAlpha=.35;X.lineWidth=1;X.beginPath();X.arc(c[0],c[1],r+3*U,0,7);X.stroke();X.restore()}
+function drawTBar(){const now=performance.now(),dt=Math.min(.05,Math.max(0,(now-(TBT||now))/1000));TBT=now;TBR=null;G.upBtn=G.sellBtn=null;
+ const k0=sel?sel.k:picked,live=!SCREEN&&!G.over&&!G.won&&!!k0&&!!T[k0];if(live)TBL={t:sel,k:k0};
+ TBA=window.TB_INSTANT?(live?1:0):cl(0,1,TBA+(live?dt:-dt)/.18);
+ if(live&&sel)tbRing(sel);
+ if(TBA<=0||!TBL||!R.tbar||SCREEN)return;
+ const e=1-Math.pow(1-TBA,3),[x,y0,bw,bh]=R.tbar,H=W.clientHeight,y=y0+(1-e)*(H-y0+8),{t,k}=TBL,I=window.towerInfo(k,t),fs=Math.round(10.5*U),pad=8*U,one=LAND;
+ X.save();X.globalAlpha=Math.min(1,.15+e);X.fillStyle='rgba(8,12,28,.74)';X.strokeStyle=I.col;X.lineWidth=1;glow(I.col,8);
+ X.beginPath();X.roundRect(x+.5,y+.5,bw-1,bh-1,Math.min(12*U,bh/2));X.fill();X.shadowBlur=0;X.stroke();
+ X.textBaseline='middle';X.textAlign='left';
+ const rowH=one?bh:40*U,isz=Math.min(rowH*.66,36*U),icx=x+pad+isz/2,icy=y+rowH/2;drawIcon(k,icx,icy,isz);
+ // name + level dots / Lv
+ const nx=x+pad+isz+7*U,nameW=one?98*U:150*U;X.font='800 '+Math.round(fs*1.1)+'px system-ui';X.fillStyle=I.col;glow(I.col,6);X.fillText(I.name,nx,y+rowH*.33,nameW);X.shadowBlur=0;
+ if(t){const n=CFG.MAX_TOWER_LEVEL,r=2.4*U,gp=r*2.7;for(let i=0;i<n;i++){X.beginPath();X.arc(nx+r+i*gp,y+rowH*.7,r,0,7);X.fillStyle=i<I.l?(I.l>=n?'#ff3cc8':'#ffd84a'):'rgba(255,255,255,.18)';X.fill()}
+  X.font='700 '+Math.round(fs*.85)+'px system-ui';X.fillStyle='#9fe';X.fillText(I.l>=n?'MAX':'Lv '+I.l,nx+(n-1)*gp+r*2+6*U,y+rowH*.7)}
+ else{X.font='700 '+Math.round(fs*.85)+'px system-ui';X.fillStyle='#9fe';X.fillText('build preview',nx,y+rowH*.7,nameW)}
+ // right end: Upgrade + Sell (placed tower) or cost + hint (build pick)
+ const bH=one?bh-16*U:30*U,bW=one?70*U:Math.min(74*U,bw*.2),by=one?y+8*U:y+(rowH-bH)/2,rx=x+bw-pad;let rightW;
+ if(t){const max=I.l>=CFG.MAX_TOWER_LEVEL,c=upCost(t),can=!max&&G.coins>=c;rightW=bW*2+6*U;const ub=[rx-rightW,by,bW,bH],sb=[rx-bW,by,bW,bH];
+  btn(...ub,max?'MAX':'⬆ ◉'+c,can?'#7dff4a':'#445',false,!can);btn(...sb,'Sell ◉'+Math.floor(spentOf(t)/2),'#ffd84a',false,false);if(live){G.upBtn=ub;G.sellBtn=sb}}
+ else{const ok=G.coins>=T[k].cost;rightW=one?118*U:130*U;X.textAlign='right';X.font='800 '+Math.round(fs*1.15)+'px system-ui';X.fillStyle=ok?'#ffd84a':'#ff5a7a';
+  X.fillText('◉'+T[k].cost+(ok?'':'  need '+(T[k].cost-G.coins)),rx,y+rowH*.36,rightW);X.font='600 '+Math.round(fs*.82)+'px system-ui';X.fillStyle='#9fe';X.fillText(k=='bar'?'tap a path cell':'tap grass to build',rx,y+rowH*.72,rightW);X.textAlign='left'}
+ X.textAlign='left';X.textBaseline='middle';
+ // middle (or 2nd row in portrait): stats with green next-level gains (+ kills), then strong / weak vs
+ const mx0=one?nx+nameW+10*U:x+pad,mx1=one?rx-rightW-10*U:rx,mw=mx1-mx0,l1=one?y+bh*.33:y+rowH+11*U,l2=one?y+bh*.72:y+rowH+27*U;
+ if(one){X.strokeStyle='rgba(255,255,255,.12)';X.beginPath();X.moveTo(mx0-5*U,y+8*U);X.lineTo(mx0-5*U,y+bh-8*U);X.stroke()}else{X.strokeStyle='rgba(255,255,255,.10)';X.beginPath();X.moveTo(x+pad,y+rowH+1);X.lineTo(rx,y+rowH+1);X.stroke()}
+ X.save();X.beginPath();X.rect(mx0,y,Math.max(0,mw),bh);X.clip();
+ const segs=[];for(const[lab,v,nv]of I.rows)segs.push([[lab+' ','#7a8fb8',.8],[v,'#e8f8ff',1],...(nv&&nv!=v?[[' → '+nv,'#7dff4a',.85]]:[])]);
+ const run=(f,go)=>{let xx=mx0;segs.forEach((sg,i)=>{if(i)xx+=9*U*f;for(const[s,c,m]of sg){X.font='700 '+Math.round(fs*m*f)+'px system-ui';if(go){X.fillStyle=c;X.fillText(s,xx,l1)}xx+=X.measureText(s).width}});return xx-mx0};
+ let f=1;const w1=run(1,false);if(w1>mw)f=Math.max(.74,mw/w1);run(f,true);
+ const pieces=[['+ '+I.pl,'#7dff4a'],['− '+I.mi,'#ff7a8a']],sp=[I.sp,'#ffd84a'],gap=12*U;let f2=1,list=[sp,...pieces];
+ const wOf=(L,ff)=>{X.font='600 '+Math.round(fs*.86*ff)+'px system-ui';return L.reduce((a,p)=>a+X.measureText(p[0]).width,0)+gap*ff*(L.length-1)};
+ if(wOf(list,1)>mw){list=pieces;if(wOf(list,1)>mw)f2=Math.max(.78,mw/wOf(list,1))}
+ let xx=mx0;X.font='600 '+Math.round(fs*.86*f2)+'px system-ui';for(const[s,c]of list){X.fillStyle=c;X.fillText(s,xx,l2);xx+=X.measureText(s).width+gap*f2}
+ X.restore();X.restore();
+ if(live)TBR=[x,y,bw,bh]}
+window.tbarRect=()=>TBR;
+// ---- round-cleared band: exactly 3.5 s of real time (frozen while paused / in menus), joined with the auto-advance countdown
+{const _u=update;update=function(dt){const m0=G.msg;_u(dt);
+  if(G.msg&&G.msg!==m0&&/cleared!/.test(G.msg)&&!G.over&&!G.won){G.clrBase=G.msg;G.clrT=3.5;G.msgT=1e9;G.clrMsg=G.msg}}}
+{const _a=advance;advance=function(dt){_a(dt);if(!(G.clrT>0))return;
+  if(G.msg!==G.clrMsg){G.clrT=0;return} // something else (wave start, called early, warnings) took the band
+  if(G.paused||SCREEN)return;G.clrT-=dt;
+  if(G.clrT<=1e-9){G.clrT=0;G.msg='';G.msgT=0;G.clrMsg=null;return}
+  G.msg=G.clrMsg=G.clrBase+(G.autoT>0&&!G.active?'  ·  next wave in '+Math.ceil(G.autoT-1e-6):'')}}
 
 layout();
 addEventListener('pagehide',saveRun);addEventListener('beforeunload',saveRun);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRun()});
